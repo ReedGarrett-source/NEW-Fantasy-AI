@@ -1,0 +1,858 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --background: #ffffff;
+  --sidebar: #f7f7f8;
+  --sidebar-hover: #ececec;
+  --border: #e5e5e5;
+  --text: #171717;
+  --muted: #6b6b6b;
+  --input: #ffffff;
+  --black: #111111;
+  --dark-gray: #2d2d2d;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+
+  background: var(--background);
+  color: var(--text);
+}
+
+body {
+  overflow: hidden;
+}
+
+button,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ========================================
+   APP
+======================================== */
+
+.app {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+}
+
+/* ========================================
+   SIDEBAR
+======================================== */
+
+.sidebar {
+  width: 260px;
+  height: 100vh;
+
+  flex-shrink: 0;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-top {
+  padding: 14px;
+}
+
+/* New Chat */
+
+.new-chat-btn {
+  width: 100%;
+  height: 44px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 0 13px;
+
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+
+  background: #ffffff;
+  color: var(--text);
+
+  font-size: 14px;
+  font-weight: 500;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.new-chat-btn:hover {
+  background: var(--sidebar-hover);
+  border-color: #cccccc;
+}
+
+.new-chat-icon {
+  font-size: 21px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+/* Sidebar Section */
+
+.sidebar-section-title {
+  margin: 25px 8px 10px;
+
+  color: #777777;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Chat History */
+
+.chat-history {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-item {
+  width: 100%;
+
+  padding: 9px 10px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: transparent;
+  color: #333333;
+
+  text-align: left;
+
+  font-size: 13px;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  transition: background 0.15s ease;
+}
+
+.history-item:hover {
+  background: var(--sidebar-hover);
+}
+
+/* Sidebar Bottom */
+
+.sidebar-bottom {
+  padding: 14px;
+
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 7px;
+}
+
+/* FantasyIQ Logo */
+
+.brand-icon,
+.welcome-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: var(--black);
+  color: #ffffff;
+
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+
+.brand-icon {
+  width: 36px;
+  height: 36px;
+
+  border-radius: 10px;
+
+  font-size: 12px;
+}
+
+.brand-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.brand-subtitle {
+  margin-top: 2px;
+
+  color: var(--muted);
+
+  font-size: 11px;
+}
+
+/* ========================================
+   MAIN
+======================================== */
+
+.main {
+  position: relative;
+
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+
+  display: flex;
+  flex-direction: column;
+
+  background: var(--background);
+}
+
+/* ========================================
+   MOBILE HEADER
+======================================== */
+
+.mobile-header {
+  display: none;
+
+  height: 55px;
+
+  flex-shrink: 0;
+
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 12px;
+
+  border-bottom: 1px solid var(--border);
+
+  background: #ffffff;
+}
+
+.mobile-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mobile-logo {
+  width: 26px;
+  height: 26px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 7px;
+
+  background: var(--black);
+  color: #ffffff;
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: none;
+  border-radius: 8px;
+
+  background: transparent;
+
+  color: var(--text);
+
+  font-size: 20px;
+
+  transition: background 0.15s ease;
+}
+
+.icon-btn:hover {
+  background: var(--sidebar-hover);
+}
+
+/* ========================================
+   CHAT CONTAINER
+======================================== */
+
+.chat-container {
+  flex: 1;
+
+  min-height: 0;
+
+  overflow-y: auto;
+
+  scroll-behavior: smooth;
+}
+
+/* ========================================
+   WELCOME SCREEN
+======================================== */
+
+.welcome-screen {
+  width: min(760px, calc(100% - 40px));
+
+  margin: 0 auto;
+
+  padding-top: 14vh;
+  padding-bottom: 50px;
+
+  text-align: center;
+}
+
+.welcome-logo {
+  width: 62px;
+  height: 62px;
+
+  margin: 0 auto 22px;
+
+  border-radius: 17px;
+
+  font-size: 20px;
+}
+
+.welcome-screen h1 {
+  font-size: 30px;
+  line-height: 1.25;
+
+  font-weight: 600;
+
+  letter-spacing: -0.025em;
+}
+
+.welcome-description {
+  max-width: 600px;
+
+  margin: 14px auto 34px;
+
+  color: var(--muted);
+
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ========================================
+   SUGGESTIONS
+======================================== */
+
+.suggestion-grid {
+  display: grid;
+
+  grid-template-columns: repeat(2, 1fr);
+
+  gap: 12px;
+
+  text-align: left;
+}
+
+.suggestion-card {
+  min-height: 84px;
+
+  display: flex;
+  align-items: center;
+  gap: 13px;
+
+  padding: 15px;
+
+  border: 1px solid var(--border);
+  border-radius: 12px;
+
+  background: #ffffff;
+  color: var(--text);
+
+  text-align: left;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.suggestion-card:hover {
+  background: #fafafa;
+  border-color: #cccccc;
+
+  transform: translateY(-1px);
+
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
+}
+
+.suggestion-card:active {
+  transform: translateY(0);
+}
+
+.suggestion-icon {
+  width: 34px;
+  height: 34px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+
+  background: #f0f0f0;
+
+  color: #333333;
+
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.suggestion-text {
+  min-width: 0;
+}
+
+.suggestion-card strong {
+  display: block;
+
+  margin-bottom: 4px;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.suggestion-card small {
+  display: block;
+
+  color: var(--muted);
+
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* ========================================
+   MESSAGES
+======================================== */
+
+.messages {
+  width: min(820px, calc(100% - 40px));
+
+  margin: 0 auto;
+
+  padding: 30px 0 40px;
+}
+
+.message {
+  display: flex;
+  gap: 13px;
+
+  margin-bottom: 28px;
+}
+
+.message-avatar {
+  width: 31px;
+  height: 31px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 8px;
+
+  font-size: 12px;
+}
+
+.message.user .message-avatar {
+  background: #e9e9e9;
+}
+
+.message.assistant .message-avatar {
+  background: var(--black);
+  color: #ffffff;
+}
+
+.message-content {
+  min-width: 0;
+
+  padding-top: 4px;
+
+  font-size: 14px;
+  line-height: 1.65;
+
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message.user .message-content {
+  font-weight: 450;
+}
+
+.message.assistant .message-content {
+  color: #292929;
+}
+
+/* ========================================
+   TYPING INDICATOR
+======================================== */
+
+.typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  height: 22px;
+}
+
+.typing span {
+  width: 6px;
+  height: 6px;
+
+  border-radius: 50%;
+
+  background: #777777;
+
+  animation: typing 1.2s infinite ease-in-out;
+}
+
+.typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* ========================================
+   INPUT SECTION
+======================================== */
+
+.input-section {
+  width: min(820px, calc(100% - 40px));
+
+  margin: 0 auto;
+
+  padding: 10px 0 18px;
+
+  background: var(--background);
+}
+
+.chat-form {
+  width: 100%;
+}
+
+.input-wrapper {
+  position: relative;
+
+  display: flex;
+  align-items: flex-end;
+
+  min-height: 56px;
+
+  padding: 8px 8px 8px 16px;
+
+  border: 1px solid #d6d6d6;
+  border-radius: 17px;
+
+  background: var(--input);
+
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 4px 15px rgba(0, 0, 0, 0.03);
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.input-wrapper:focus-within {
+  border-color: #a9a9a9;
+
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+#messageInput {
+  flex: 1;
+
+  width: 100%;
+
+  resize: none;
+
+  max-height: 180px;
+
+  padding: 8px 5px;
+
+  border: none;
+  outline: none;
+
+  background: transparent;
+
+  color: var(--text);
+
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#messageInput::placeholder {
+  color: #888888;
+}
+
+/* Send Button */
+
+.send-btn {
+  width: 38px;
+  height: 38px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: none;
+  border-radius: 10px;
+
+  background: var(--black);
+  color: #ffffff;
+
+  font-size: 21px;
+  font-weight: 400;
+
+  transition:
+    background 0.15s ease,
+    opacity 0.15s ease,
+    transform 0.1s ease;
+}
+
+.send-btn:hover {
+  background: var(--dark-gray);
+}
+
+.send-btn:active {
+  transform: scale(0.95);
+}
+
+.send-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.input-disclaimer {
+  padding-top: 8px;
+
+  color: #8a8a8a;
+
+  font-size: 10px;
+
+  text-align: center;
+}
+
+/* ========================================
+   MOBILE SIDEBAR OVERLAY
+======================================== */
+
+.sidebar-overlay {
+  display: none;
+
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 90;
+
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* ========================================
+   SCROLLBAR
+======================================== */
+
+.chat-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-container::-webkit-scrollbar-thumb {
+  background: #d5d5d5;
+  border-radius: 10px;
+}
+
+.chat-container::-webkit-scrollbar-thumb:hover {
+  background: #bbbbbb;
+}
+
+/* ========================================
+   MOBILE
+======================================== */
+
+@media (max-width: 700px) {
+
+  .sidebar {
+    position: fixed;
+
+    left: 0;
+    top: 0;
+    bottom: 0;
+
+    z-index: 100;
+
+    transform: translateX(-100%);
+
+    transition: transform 0.2s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay.open {
+    display: block;
+  }
+
+  .mobile-header {
+    display: flex;
+  }
+
+  .welcome-screen {
+    width: calc(100% - 28px);
+
+    padding-top: 10vh;
+  }
+
+  .welcome-logo {
+    width: 56px;
+    height: 56px;
+
+    margin-bottom: 18px;
+
+    font-size: 18px;
+  }
+
+  .welcome-screen h1 {
+    font-size: 25px;
+  }
+
+  .welcome-description {
+    font-size: 14px;
+
+    margin-bottom: 28px;
+  }
+
+  .suggestion-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .suggestion-card {
+    min-height: 76px;
+  }
+
+  .messages {
+    width: calc(100% - 28px);
+
+    padding-top: 24px;
+  }
+
+  .message {
+    gap: 10px;
+
+    margin-bottom: 24px;
+  }
+
+  .message-avatar {
+    width: 29px;
+    height: 29px;
+  }
+
+  .message-content {
+    font-size: 14px;
+  }
+
+  .input-section {
+    width: calc(100% - 24px);
+
+    padding-bottom: 12px;
+  }
+
+  .input-disclaimer {
+    font-size: 9px;
+  }
+}
+
+/* ========================================
+   SMALL PHONES
+======================================== */
+
+@media (max-width: 420px) {
+
+  .welcome-screen {
+    width: calc(100% - 24px);
+  }
+
+  .welcome-screen h1 {
+    font-size: 23px;
+  }
+
+  .welcome-description {
+    font-size: 13px;
+  }
+
+  .suggestion-card {
+    min-height: 72px;
+
+    padding: 13px;
+  }
+
+  .suggestion-icon {
+    width: 31px;
+    height: 31px;
+
+    font-size: 14px;
+  }
+}
