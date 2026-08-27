@@ -9,14 +9,14 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve the frontend
+// Serve the FantasyIQ frontend
 app.use(express.static(path.join(__dirname, "public")));
 
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,
-    message: "Fantasy AI backend is running."
+    message: "FantasyIQ backend is running."
   });
 });
 
@@ -36,6 +36,7 @@ app.post("/api/chat", async (req, res) => {
       success: true,
       response: `I received your question: "${message}"`
     });
+
   } catch (error) {
     console.error("Chat error:", error);
 
@@ -46,12 +47,26 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-// Catch-all route for the frontend
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+// Serve index.html for all non-API routes
+app.use((req, res, next) => {
+  if (req.method === "GET" && !req.path.startsWith("/api/")) {
+    return res.sendFile(
+      path.join(__dirname, "public", "index.html")
+    );
+  }
+
+  next();
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: "Route not found."
+  });
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Fantasy AI running on port ${PORT}`);
+  console.log(`FantasyIQ running on port ${PORT}`);
 });
