@@ -3,10 +3,303 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fantasy AI</title>
+
+  <meta
+    name="description"
+    content="FantasyIQ - Your AI-powered fantasy football assistant"
+  >
+
+  <title>FantasyIQ</title>
+
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <h1>Fantasy AI</h1>
-  <p>Coming soon...</p>
+
+  <div class="app">
+
+    <!-- =========================
+         SIDEBAR
+    ========================== -->
+
+    <aside class="sidebar" id="sidebar">
+
+      <div class="sidebar-top">
+
+        <button class="new-chat-btn" id="newChatBtn">
+          <span class="new-chat-icon">+</span>
+          <span>New chat</span>
+        </button>
+
+        <div class="sidebar-section-title">
+          Recent
+        </div>
+
+        <div class="chat-history" id="chatHistory">
+          <!-- Conversations will be added here -->
+        </div>
+
+      </div>
+
+      <div class="sidebar-bottom">
+
+        <div class="sidebar-brand">
+
+          <div class="brand-icon">
+            IQ
+          </div>
+
+          <div class="brand-text">
+            <div class="brand-name">
+              FantasyIQ
+            </div>
+
+            <div class="brand-subtitle">
+              Fantasy Football AI
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </aside>
+
+
+    <!-- =========================
+         MAIN
+    ========================== -->
+
+    <main class="main">
+
+      <!-- MOBILE HEADER -->
+
+      <header class="mobile-header">
+
+        <button
+          class="icon-btn"
+          id="mobileMenuBtn"
+          aria-label="Open menu"
+        >
+          ☰
+        </button>
+
+        <div class="mobile-title">
+          <span class="mobile-logo">IQ</span>
+          FantasyIQ
+        </div>
+
+        <button
+          class="icon-btn"
+          id="mobileNewChatBtn"
+          aria-label="New chat"
+        >
+          +
+        </button>
+
+      </header>
+
+
+      <!-- =========================
+           CHAT CONTAINER
+      ========================== -->
+
+      <section
+        class="chat-container"
+        id="chatContainer"
+      >
+
+        <!-- WELCOME -->
+
+        <div
+          class="welcome-screen"
+          id="welcomeScreen"
+        >
+
+          <div class="welcome-logo">
+            IQ
+          </div>
+
+          <h1>
+            How can I help with your fantasy team?
+          </h1>
+
+          <p class="welcome-description">
+            Ask FantasyIQ about players, trades, waivers,
+            drafts, lineups, rankings, or anything fantasy football.
+          </p>
+
+
+          <!-- SUGGESTIONS -->
+
+          <div class="suggestion-grid">
+
+            <button
+              class="suggestion-card"
+              data-question="Who should I start this week?"
+            >
+
+              <div class="suggestion-icon">
+                ▶
+              </div>
+
+              <div class="suggestion-text">
+
+                <strong>
+                  Start / Sit
+                </strong>
+
+                <small>
+                  Who should I start this week?
+                </small>
+
+              </div>
+
+            </button>
+
+
+            <button
+              class="suggestion-card"
+              data-question="Can you analyze a fantasy football trade for me?"
+            >
+
+              <div class="suggestion-icon">
+                ↔
+              </div>
+
+              <div class="suggestion-text">
+
+                <strong>
+                  Analyze a trade
+                </strong>
+
+                <small>
+                  Is my fantasy trade fair?
+                </small>
+
+              </div>
+
+            </button>
+
+
+            <button
+              class="suggestion-card"
+              data-question="Who are the best waiver wire pickups this week?"
+            >
+
+              <div class="suggestion-icon">
+                +
+              </div>
+
+              <div class="suggestion-text">
+
+                <strong>
+                  Waiver wire
+                </strong>
+
+                <small>
+                  Find players I should pick up.
+                </small>
+
+              </div>
+
+            </button>
+
+
+            <button
+              class="suggestion-card"
+              data-question="Who should I draft next?"
+            >
+
+              <div class="suggestion-icon">
+                ★
+              </div>
+
+              <div class="suggestion-text">
+
+                <strong>
+                  Draft advice
+                </strong>
+
+                <small>
+                  Who should I draft next?
+                </small>
+
+              </div>
+
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <!-- MESSAGES -->
+
+        <div
+          class="messages"
+          id="messages"
+        ></div>
+
+      </section>
+
+
+      <!-- =========================
+           INPUT
+      ========================== -->
+
+      <section class="input-section">
+
+        <form
+          class="chat-form"
+          id="chatForm"
+        >
+
+          <div class="input-wrapper">
+
+            <textarea
+              id="messageInput"
+              rows="1"
+              placeholder="Ask FantasyIQ anything..."
+              autocomplete="off"
+              aria-label="Message FantasyIQ"
+            ></textarea>
+
+            <button
+              type="submit"
+              class="send-btn"
+              id="sendBtn"
+              aria-label="Send message"
+            >
+              ↑
+            </button>
+
+          </div>
+
+        </form>
+
+        <div class="input-disclaimer">
+          FantasyIQ can make mistakes. Always verify important information.
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+
+  <!-- =========================
+       MOBILE OVERLAY
+  ========================== -->
+
+  <div
+    class="sidebar-overlay"
+    id="sidebarOverlay"
+  ></div>
+
+
+  <script src="app.js"></script>
+
 </body>
 </html>
