@@ -2,304 +2,566 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Mets HQ</title>
 
   <meta
     name="description"
-    content="FantasyIQ - Your AI-powered fantasy football assistant"
+    content="Mets HQ - Your interactive New York Mets dashboard."
   >
 
-  <title>FantasyIQ</title>
-
-  <link rel="stylesheet" href="style.css">
+  <link
+    rel="stylesheet"
+    href="/style.css"
+  >
 </head>
 
 <body>
 
-  <div class="app">
+  <!-- =====================================
+       TOP NAVIGATION
+       ===================================== -->
 
-    <!-- =========================
-         SIDEBAR
-    ========================== -->
+  <header class="topbar">
 
-    <aside class="sidebar" id="sidebar">
+    <div class="brand">
 
-      <div class="sidebar-top">
-
-        <button class="new-chat-btn" id="newChatBtn">
-          <span class="new-chat-icon">+</span>
-          <span>New chat</span>
-        </button>
-
-        <div class="sidebar-section-title">
-          Recent
-        </div>
-
-        <div class="chat-history" id="chatHistory">
-          <!-- Conversations will be added here -->
-        </div>
-
+      <div class="brand-mark">
+        NY
       </div>
 
-      <div class="sidebar-bottom">
-
-        <div class="sidebar-brand">
-
-          <div class="brand-icon">
-            IQ
-          </div>
-
-          <div class="brand-text">
-            <div class="brand-name">
-              FantasyIQ
-            </div>
-
-            <div class="brand-subtitle">
-              Fantasy Football AI
-            </div>
-          </div>
-
+      <div>
+        <div class="brand-name">
+          Mets HQ
         </div>
 
+        <div class="brand-subtitle">
+          New York Mets Dashboard
+        </div>
       </div>
 
-    </aside>
+    </div>
 
+    <nav class="nav">
 
-    <!-- =========================
-         MAIN
-    ========================== -->
-
-    <main class="main">
-
-      <!-- MOBILE HEADER -->
-
-      <header class="mobile-header">
-
-        <button
-          class="icon-btn"
-          id="mobileMenuBtn"
-          aria-label="Open menu"
-        >
-          ☰
-        </button>
-
-        <div class="mobile-title">
-          <span class="mobile-logo">IQ</span>
-          FantasyIQ
-        </div>
-
-        <button
-          class="icon-btn"
-          id="mobileNewChatBtn"
-          aria-label="New chat"
-        >
-          +
-        </button>
-
-      </header>
-
-
-      <!-- =========================
-           CHAT CONTAINER
-      ========================== -->
-
-      <section
-        class="chat-container"
-        id="chatContainer"
+      <button
+        class="nav-button active"
+        data-section="home"
       >
+        Home
+      </button>
 
-        <!-- WELCOME -->
+      <button
+        class="nav-button"
+        data-section="games"
+      >
+        Games
+      </button>
 
-        <div
-          class="welcome-screen"
-          id="welcomeScreen"
-        >
+      <button
+        class="nav-button"
+        data-section="roster"
+      >
+        Roster
+      </button>
 
-          <div class="welcome-logo">
-            IQ
+      <button
+        class="nav-button"
+        data-section="stats"
+      >
+        Stats
+      </button>
+
+      <button
+        class="nav-button"
+        data-section="transactions"
+      >
+        Transactions
+      </button>
+
+    </nav>
+
+  </header>
+
+
+  <!-- =====================================
+       MAIN
+       ===================================== -->
+
+  <main class="container">
+
+    <!-- ===================================
+         HOME
+         =================================== -->
+
+    <section
+      id="home-section"
+      class="section active"
+    >
+
+      <div class="hero">
+
+        <div>
+
+          <div class="eyebrow">
+            NEW YORK METS
           </div>
 
           <h1>
-            How can I help with your fantasy team?
+            Mets HQ
           </h1>
 
-          <p class="welcome-description">
-            Ask FantasyIQ about players, trades, waivers,
-            drafts, lineups, rankings, or anything fantasy football.
+          <p>
+            Everything you need to follow the Mets.
           </p>
 
+        </div>
 
-          <!-- SUGGESTIONS -->
+        <div class="hero-season">
+          2026
+        </div>
 
-          <div class="suggestion-grid">
-
-            <button
-              class="suggestion-card"
-              data-question="Who should I start this week?"
-            >
-
-              <div class="suggestion-icon">
-                ▶
-              </div>
-
-              <div class="suggestion-text">
-
-                <strong>
-                  Start / Sit
-                </strong>
-
-                <small>
-                  Who should I start this week?
-                </small>
-
-              </div>
-
-            </button>
+      </div>
 
 
-            <button
-              class="suggestion-card"
-              data-question="Can you analyze a fantasy football trade for me?"
-            >
+      <!-- RECORD CARDS -->
 
-              <div class="suggestion-icon">
-                ↔
-              </div>
+      <div class="cards">
 
-              <div class="suggestion-text">
+        <div class="card">
 
-                <strong>
-                  Analyze a trade
-                </strong>
+          <div class="card-label">
+            RECORD
+          </div>
 
-                <small>
-                  Is my fantasy trade fair?
-                </small>
+          <div
+            id="record"
+            class="card-value"
+          >
+            —
+          </div>
 
-              </div>
-
-            </button>
-
-
-            <button
-              class="suggestion-card"
-              data-question="Who are the best waiver wire pickups this week?"
-            >
-
-              <div class="suggestion-icon">
-                +
-              </div>
-
-              <div class="suggestion-text">
-
-                <strong>
-                  Waiver wire
-                </strong>
-
-                <small>
-                  Find players I should pick up.
-                </small>
-
-              </div>
-
-            </button>
-
-
-            <button
-              class="suggestion-card"
-              data-question="Who should I draft next?"
-            >
-
-              <div class="suggestion-icon">
-                ★
-              </div>
-
-              <div class="suggestion-text">
-
-                <strong>
-                  Draft advice
-                </strong>
-
-                <small>
-                  Who should I draft next?
-                </small>
-
-              </div>
-
-            </button>
-
+          <div
+            id="record-sub"
+            class="card-sub"
+          >
+            Loading...
           </div>
 
         </div>
 
 
-        <!-- MESSAGES -->
+        <div class="card">
 
-        <div
-          class="messages"
-          id="messages"
-        ></div>
+          <div class="card-label">
+            DIVISION
+          </div>
 
-      </section>
+          <div
+            id="division-rank"
+            class="card-value"
+          >
+            —
+          </div>
+
+          <div
+            id="games-back"
+            class="card-sub"
+          >
+            Loading...
+          </div>
+
+        </div>
 
 
-      <!-- =========================
-           INPUT
-      ========================== -->
+        <div class="card">
 
-      <section class="input-section">
+          <div class="card-label">
+            LAST 10
+          </div>
 
-        <form
-          class="chat-form"
-          id="chatForm"
+          <div
+            id="last-ten"
+            class="card-value"
+          >
+            —
+          </div>
+
+          <div class="card-sub">
+            Recent form
+          </div>
+
+        </div>
+
+
+        <div class="card">
+
+          <div class="card-label">
+            STREAK
+          </div>
+
+          <div
+            id="streak"
+            class="card-value"
+          >
+            —
+          </div>
+
+          <div class="card-sub">
+            Current streak
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- NEXT GAME -->
+
+      <div class="section-heading">
+
+        <div>
+          <span class="eyebrow">
+            SCHEDULE
+          </span>
+
+          <h2>
+            Around the Mets
+          </h2>
+        </div>
+
+        <button
+          id="refresh-home"
+          class="secondary-button"
         >
+          Refresh
+        </button>
 
-          <div class="input-wrapper">
+      </div>
 
-            <textarea
-              id="messageInput"
-              rows="1"
-              placeholder="Ask FantasyIQ anything..."
-              autocomplete="off"
-              aria-label="Message FantasyIQ"
-            ></textarea>
 
-            <button
-              type="submit"
-              class="send-btn"
-              id="sendBtn"
-              aria-label="Send message"
-            >
-              ↑
-            </button>
+      <div
+        id="home-games"
+        class="game-list"
+      >
 
-          </div>
-
-        </form>
-
-        <div class="input-disclaimer">
-          FantasyIQ can make mistakes. Always verify important information.
+        <div class="loading">
+          Loading Mets games...
         </div>
 
-      </section>
+      </div>
 
-    </main>
+
+      <!-- QUICK LINKS -->
+
+      <div class="section-heading">
+
+        <div>
+          <span class="eyebrow">
+            EXPLORE
+          </span>
+
+          <h2>
+            Mets HQ
+          </h2>
+        </div>
+
+      </div>
+
+
+      <div class="quick-grid">
+
+        <button
+          class="quick-card"
+          data-section="games"
+        >
+          <span class="quick-icon">⚾</span>
+          <strong>Games</strong>
+          <span>Schedule and recent results</span>
+        </button>
+
+        <button
+          class="quick-card"
+          data-section="roster"
+        >
+          <span class="quick-icon">👥</span>
+          <strong>Roster</strong>
+          <span>Current Mets players</span>
+        </button>
+
+        <button
+          class="quick-card"
+          data-section="stats"
+        >
+          <span class="quick-icon">📊</span>
+          <strong>Stats</strong>
+          <span>Team and player statistics</span>
+        </button>
+
+        <button
+          class="quick-card"
+          data-section="transactions"
+        >
+          <span class="quick-icon">🔄</span>
+          <strong>Transactions</strong>
+          <span>Recent Mets moves</span>
+        </button>
+
+      </div>
+
+    </section>
+
+
+    <!-- ===================================
+         GAMES
+         =================================== -->
+
+    <section
+      id="games-section"
+      class="section"
+    >
+
+      <div class="page-header">
+
+        <div>
+
+          <span class="eyebrow">
+            NEW YORK METS
+          </span>
+
+          <h1>
+            Games
+          </h1>
+
+          <p>
+            Recent and upcoming Mets games.
+          </p>
+
+        </div>
+
+        <button
+          id="refresh-games"
+          class="secondary-button"
+        >
+          Refresh
+        </button>
+
+      </div>
+
+      <div
+        id="games-list"
+        class="game-list"
+      >
+
+        <div class="loading">
+          Loading games...
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ===================================
+         ROSTER
+         =================================== -->
+
+    <section
+      id="roster-section"
+      class="section"
+    >
+
+      <div class="page-header">
+
+        <div>
+
+          <span class="eyebrow">
+            NEW YORK METS
+          </span>
+
+          <h1>
+            Roster
+          </h1>
+
+          <p>
+            Mets 40-man roster.
+          </p>
+
+        </div>
+
+        <button
+          id="refresh-roster"
+          class="secondary-button"
+        >
+          Refresh
+        </button>
+
+      </div>
+
+      <div
+        id="roster-grid"
+        class="roster-grid"
+      >
+
+        <div class="loading">
+          Loading roster...
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ===================================
+         STATS
+         =================================== -->
+
+    <section
+      id="stats-section"
+      class="section"
+    >
+
+      <div class="page-header">
+
+        <div>
+
+          <span class="eyebrow">
+            2026 SEASON
+          </span>
+
+          <h1>
+            Mets Stats
+          </h1>
+
+          <p>
+            Current team hitting statistics.
+          </p>
+
+        </div>
+
+        <button
+          id="refresh-stats"
+          class="secondary-button"
+        >
+          Refresh
+        </button>
+
+      </div>
+
+      <div
+        id="stats-table-container"
+        class="table-container"
+      >
+
+        <div class="loading">
+          Loading statistics...
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ===================================
+         TRANSACTIONS
+         =================================== -->
+
+    <section
+      id="transactions-section"
+      class="section"
+    >
+
+      <div class="page-header">
+
+        <div>
+
+          <span class="eyebrow">
+            METS MOVES
+          </span>
+
+          <h1>
+            Transactions
+          </h1>
+
+          <p>
+            Recent Mets roster moves.
+          </p>
+
+        </div>
+
+        <button
+          id="refresh-transactions"
+          class="secondary-button"
+        >
+          Refresh
+        </button>
+
+      </div>
+
+      <div
+        id="transactions-list"
+        class="transaction-list"
+      >
+
+        <div class="loading">
+          Loading transactions...
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <!-- =====================================
+       PLAYER MODAL
+       ===================================== -->
+
+  <div
+    id="player-modal"
+    class="modal hidden"
+  >
+
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-content">
+
+      <button
+        id="close-modal"
+        class="modal-close"
+      >
+        ×
+      </button>
+
+      <div id="player-details">
+        Loading player...
+      </div>
+
+    </div>
 
   </div>
 
 
-  <!-- =========================
-       MOBILE OVERLAY
-  ========================== -->
+  <footer>
 
-  <div
-    class="sidebar-overlay"
-    id="sidebarOverlay"
-  ></div>
+    <div>
+      Mets HQ
+    </div>
+
+    <div>
+      Data provided by MLB Stats API
+    </div>
+
+  </footer>
 
 
-  <script src="app.js"></script>
+  <script src="/app.js"></script>
 
 </body>
 </html>
