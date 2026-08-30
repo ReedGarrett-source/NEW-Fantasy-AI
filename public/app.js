@@ -1,13 +1,8 @@
-// ============================================
-// METS HQ
-// FRONTEND APPLICATION
-// ============================================
-
 const CURRENT_SEASON = 2026;
 
 
 // ============================================
-// API HELPER
+// API
 // ============================================
 
 async function api(url) {
@@ -18,7 +13,7 @@ async function api(url) {
 
   if (!response.ok || data.success === false) {
     throw new Error(
-      data.error || "Request failed."
+      data.error || "Request failed"
     );
   }
 
@@ -27,8 +22,19 @@ async function api(url) {
 
 
 // ============================================
-// FORMATTERS
+// HELPERS
 // ============================================
+
+function escapeHTML(value) {
+
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 
 function formatDate(dateString) {
 
@@ -49,37 +55,6 @@ function formatDate(dateString) {
 }
 
 
-function formatDateTime(dateString) {
-
-  if (!dateString) {
-    return "—";
-  }
-
-  const date = new Date(dateString);
-
-  return date.toLocaleString(
-    "en-US",
-    {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit"
-    }
-  );
-}
-
-
-function escapeHTML(value) {
-
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-
 // ============================================
 // NAVIGATION
 // ============================================
@@ -89,31 +64,42 @@ function showSection(sectionName) {
   document
     .querySelectorAll(".section")
     .forEach(section => {
+
       section.classList.remove("active");
+
     });
+
 
   document
     .querySelectorAll(".nav-button")
     .forEach(button => {
+
       button.classList.remove("active");
+
     });
+
 
   const section =
     document.getElementById(
       `${sectionName}-section`
     );
 
+
   if (section) {
     section.classList.add("active");
   }
+
 
   document
     .querySelectorAll(
       `[data-section="${sectionName}"]`
     )
     .forEach(button => {
+
       button.classList.add("active");
+
     });
+
 
   window.scrollTo({
     top: 0,
@@ -136,6 +122,7 @@ function showSection(sectionName) {
   if (sectionName === "transactions") {
     loadTransactions();
   }
+
 }
 
 
@@ -163,25 +150,6 @@ document
 
 async function loadStandings() {
 
-  const recordElement =
-    document.getElementById("record");
-
-  const recordSub =
-    document.getElementById("record-sub");
-
-  const divisionRank =
-    document.getElementById("division-rank");
-
-  const gamesBack =
-    document.getElementById("games-back");
-
-  const lastTen =
-    document.getElementById("last-ten");
-
-  const streak =
-    document.getElementById("streak");
-
-
   try {
 
     const data =
@@ -189,17 +157,12 @@ async function loadStandings() {
         `/api/mets/standings?season=${CURRENT_SEASON}`
       );
 
+
     const mets =
       data.mets;
 
 
     if (!mets) {
-
-      recordElement.textContent = "—";
-
-      recordSub.textContent =
-        "Standings unavailable";
-
       return;
     }
 
@@ -211,53 +174,55 @@ async function loadStandings() {
       mets.losses ?? 0;
 
 
-    recordElement.textContent =
+    document.getElementById(
+      "record"
+    ).textContent =
       `${wins}-${losses}`;
 
 
-    recordSub.textContent =
+    document.getElementById(
+      "record-sub"
+    ).textContent =
       `Win % ${mets.winningPercentage || "—"}`;
 
 
-    divisionRank.textContent =
+    document.getElementById(
+      "division-rank"
+    ).textContent =
       mets.divisionRank
         ? `#${mets.divisionRank}`
         : "—";
 
 
-    gamesBack.textContent =
+    document.getElementById(
+      "games-back"
+    ).textContent =
       mets.gamesBack === "0.0"
         ? "1st place"
         : `${mets.gamesBack || "—"} GB`;
 
 
-    if (mets.lastTen) {
-
-      lastTen.textContent =
-        mets.lastTen;
-
-    }
+    document.getElementById(
+      "last-ten"
+    ).textContent =
+      mets.lastTen || "—";
 
 
-    if (mets.streak) {
+    document.getElementById(
+      "streak"
+    ).textContent =
+      mets.streak?.streakCode || "—";
 
-      streak.textContent =
-        mets.streak.streakCode ||
-        "—";
-
-    }
 
   } catch (error) {
 
-    console.error(error);
-
-    recordElement.textContent =
-      "—";
-
-    recordSub.textContent =
-      "Unable to load";
+    console.error(
+      "Standings:",
+      error
+    );
 
   }
+
 }
 
 
@@ -265,32 +230,37 @@ async function loadStandings() {
 // GAMES
 // ============================================
 
-function getMetsGameInfo(game) {
+function getGameInfo(game) {
 
-  const homeTeam =
-    game.teams?.home?.team;
+  const home =
+    game.teams?.home;
 
-  const awayTeam =
-    game.teams?.away?.team;
+  const away =
+    game.teams?.away;
+
 
   const metsIsHome =
-    Number(homeTeam?.id) === 121;
+    Number(home?.team?.id) === 121;
 
-  const metsTeam =
-    metsIsHome
-      ? game.teams.home
-      : game.teams.away;
 
-  const opponentTeam =
+  const mets =
     metsIsHome
-      ? awayTeam
-      : homeTeam;
+      ? home
+      : away;
+
+
+  const opponent =
+    metsIsHome
+      ? away
+      : home;
+
 
   return {
     metsIsHome,
-    metsTeam,
-    opponentTeam
+    mets,
+    opponent
   };
+
 }
 
 
@@ -298,27 +268,38 @@ function renderGame(game) {
 
   const {
     metsIsHome,
-    metsTeam,
-    opponentTeam
-  } = getMetsGameInfo(game);
+    mets,
+    opponent
+  } =
+    getGameInfo(game);
 
 
-  const status =
-    game.status?.detailedState ||
-    game.status?.abstractGameState ||
-    "Scheduled";
+  // THIS WAS ONE OF THE BUGS.
+  // opponent is already the game team object.
+  const opponentName =
+    opponent?.team?.name ||
+    opponent?.team?.teamName ||
+    "Unknown Opponent";
 
 
   const metsScore =
-    metsTeam?.score;
+    mets?.score;
+
 
   const opponentScore =
-    opponentTeam?.score;
+    opponent?.score;
+
+
+  const isFinal =
+    game.status?.abstractGameState ===
+      "Final";
 
 
   let resultClass = "";
 
+
   if (
+    isFinal &&
     typeof metsScore === "number" &&
     typeof opponentScore === "number"
   ) {
@@ -330,19 +311,22 @@ function renderGame(game) {
     if (metsScore < opponentScore) {
       resultClass = "loss";
     }
+
   }
 
 
   const scoreText =
     typeof metsScore === "number" &&
     typeof opponentScore === "number"
+
       ? `${metsScore} - ${opponentScore}`
+
       : "—";
 
 
-  const opponentName =
-    opponentTeam?.team?.name ||
-    "Opponent";
+  const status =
+    game.status?.detailedState ||
+    "Scheduled";
 
 
   const location =
@@ -352,11 +336,13 @@ function renderGame(game) {
 
 
   return `
+
     <div class="game">
 
       <div class="game-date">
         ${formatDate(game.gameDate)}
       </div>
+
 
       <div class="game-teams">
 
@@ -364,51 +350,82 @@ function renderGame(game) {
           Mets
         </span>
 
+
         <span>
           ${location}
         </span>
 
+
         <span class="team-name">
-          ${escapeHTML(opponentName)}
+
+          ${escapeHTML(
+            opponentName
+          )}
+
         </span>
 
-        <span class="game-score ${resultClass}">
+
+        <span
+          class="game-score ${resultClass}"
+        >
+
           ${scoreText}
+
         </span>
 
       </div>
 
+
       <div class="game-status">
+
         ${escapeHTML(status)}
+
       </div>
 
     </div>
+
   `;
+
 }
 
 
 async function loadGames() {
 
   const container =
-    document.getElementById("games-list");
+    document.getElementById(
+      "games-list"
+    );
+
 
   const homeContainer =
-    document.getElementById("home-games");
+    document.getElementById(
+      "home-games"
+    );
 
 
   container.innerHTML =
-    `<div class="loading">Loading games...</div>`;
+    `<div class="loading">
+      Loading games...
+    </div>`;
+
 
   if (homeContainer) {
+
     homeContainer.innerHTML =
-      `<div class="loading">Loading Mets games...</div>`;
+      `<div class="loading">
+        Loading Mets games...
+      </div>`;
+
   }
 
 
   try {
 
     const data =
-      await api("/api/mets/games");
+      await api(
+        "/api/mets/games"
+      );
+
 
     const games =
       data.games || [];
@@ -417,25 +434,19 @@ async function loadGames() {
     if (!games.length) {
 
       container.innerHTML =
-        `<div class="loading">No games found.</div>`;
-
-      if (homeContainer) {
-        homeContainer.innerHTML =
-          `<div class="loading">No games found.</div>`;
-      }
+        `<div class="loading">
+          No games found.
+        </div>`;
 
       return;
+
     }
 
 
-    const html =
+    container.innerHTML =
       games
         .map(renderGame)
         .join("");
-
-
-    container.innerHTML =
-      html;
 
 
     if (homeContainer) {
@@ -448,47 +459,48 @@ async function loadGames() {
 
     }
 
+
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Games:",
+      error
+    );
+
 
     container.innerHTML =
       `<div class="loading">
         Unable to load Mets games.
       </div>`;
 
-    if (homeContainer) {
-
-      homeContainer.innerHTML =
-        `<div class="loading">
-          Unable to load Mets games.
-        </div>`;
-
-    }
-
   }
+
 }
 
 
 // ============================================
-// ROSTER
+// ACTIVE ROSTER
 // ============================================
 
 async function loadRoster() {
 
   const container =
-    document.getElementById("roster-grid");
+    document.getElementById(
+      "roster-grid"
+    );
 
 
   container.innerHTML =
-    `<div class="loading">Loading roster...</div>`;
+    `<div class="loading">
+      Loading active Mets roster...
+    </div>`;
 
 
   try {
 
     const data =
       await api(
-        `/api/mets/roster?season=${CURRENT_SEASON}&rosterType=40Man`
+        `/api/mets/roster?season=${CURRENT_SEASON}`
       );
 
 
@@ -500,10 +512,11 @@ async function loadRoster() {
 
       container.innerHTML =
         `<div class="loading">
-          No roster data found.
+          No active roster found.
         </div>`;
 
       return;
+
     }
 
 
@@ -514,10 +527,6 @@ async function loadRoster() {
           const person =
             player.person || {};
 
-          const position =
-            player.position?.abbreviation ||
-            player.position?.name ||
-            "—";
 
           const number =
             player.jerseyNumber ||
@@ -525,7 +534,14 @@ async function loadRoster() {
             "—";
 
 
+          const position =
+            player.position?.abbreviation ||
+            player.position?.name ||
+            "—";
+
+
           return `
+
             <div
               class="player-card"
               data-player-id="${person.id}"
@@ -534,20 +550,30 @@ async function loadRoster() {
               <div class="player-top">
 
                 <div class="player-number">
+
                   ${escapeHTML(number)}
+
                 </div>
+
 
                 <div>
 
                   <div class="player-name">
+
                     ${escapeHTML(
                       person.fullName ||
                       "Unknown Player"
                     )}
+
                   </div>
 
+
                   <div class="player-position">
-                    ${escapeHTML(position)}
+
+                    ${escapeHTML(
+                      position
+                    )}
+
                   </div>
 
                 </div>
@@ -555,6 +581,7 @@ async function loadRoster() {
               </div>
 
             </div>
+
           `;
 
         })
@@ -581,31 +608,43 @@ async function loadRoster() {
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Roster:",
+      error
+    );
+
 
     container.innerHTML =
       `<div class="loading">
-        Unable to load Mets roster.
+        Unable to load active Mets roster.
       </div>`;
 
   }
+
 }
 
 
 // ============================================
-// PLAYER MODAL
+// PLAYER
 // ============================================
 
 async function openPlayer(playerId) {
 
   const modal =
-    document.getElementById("player-modal");
+    document.getElementById(
+      "player-modal"
+    );
+
 
   const details =
-    document.getElementById("player-details");
+    document.getElementById(
+      "player-details"
+    );
 
 
-  modal.classList.remove("hidden");
+  modal.classList.remove(
+    "hidden"
+  );
 
 
   details.innerHTML =
@@ -621,43 +660,54 @@ async function openPlayer(playerId) {
         `/api/player/${playerId}`
       );
 
+
     const statsData =
       await api(
-        `/api/player/${playerId}/stats?season=${CURRENT_SEASON}&group=hitting&stats=season`
+        `/api/player/${playerId}/stats?season=${CURRENT_SEASON}&group=hitting`
       );
 
 
     const player =
       playerData.player;
 
+
+    const split =
+      statsData.stats?.[0]?.splits?.[0];
+
+
     const stat =
-      statsData.stats?.[0]?.splits?.[0]?.stat ||
-      statsData.stats?.[0]?.stat ||
-      {};
-
-
-    const fullName =
-      player?.fullName ||
-      "Unknown Player";
-
-
-    const position =
-      player?.primaryPosition?.name ||
-      "—";
+      split?.stat || {};
 
 
     details.innerHTML = `
 
       <div class="player-modal-name">
-        ${escapeHTML(fullName)}
+
+        ${escapeHTML(
+          player?.fullName ||
+          "Unknown Player"
+        )}
+
       </div>
 
+
       <div class="player-modal-info">
-        ${escapeHTML(position)}
-        ${player?.primaryNumber
-          ? ` · #${escapeHTML(player.primaryNumber)}`
-          : ""}
+
+        ${escapeHTML(
+          player?.primaryPosition?.name ||
+          "—"
+        )}
+
+        ${
+          player?.primaryNumber
+            ? ` · #${escapeHTML(
+                player.primaryNumber
+              )}`
+            : ""
+        }
+
       </div>
+
 
       <div class="player-stat-grid">
 
@@ -668,10 +718,13 @@ async function openPlayer(playerId) {
           </div>
 
           <div class="player-stat-value">
-            ${escapeHTML(stat.avg || "—")}
+            ${escapeHTML(
+              stat.avg || "—"
+            )}
           </div>
 
         </div>
+
 
         <div class="player-stat">
 
@@ -680,10 +733,13 @@ async function openPlayer(playerId) {
           </div>
 
           <div class="player-stat-value">
-            ${escapeHTML(stat.homeRuns ?? "—")}
+            ${escapeHTML(
+              stat.homeRuns ?? "—"
+            )}
           </div>
 
         </div>
+
 
         <div class="player-stat">
 
@@ -692,10 +748,13 @@ async function openPlayer(playerId) {
           </div>
 
           <div class="player-stat-value">
-            ${escapeHTML(stat.rbi ?? "—")}
+            ${escapeHTML(
+              stat.rbi ?? "—"
+            )}
           </div>
 
         </div>
+
 
         <div class="player-stat">
 
@@ -704,10 +763,13 @@ async function openPlayer(playerId) {
           </div>
 
           <div class="player-stat-value">
-            ${escapeHTML(stat.ops || "—")}
+            ${escapeHTML(
+              stat.ops || "—"
+            )}
           </div>
 
         </div>
+
 
         <div class="player-stat">
 
@@ -716,10 +778,13 @@ async function openPlayer(playerId) {
           </div>
 
           <div class="player-stat-value">
-            ${escapeHTML(stat.obp || "—")}
+            ${escapeHTML(
+              stat.obp || "—"
+            )}
           </div>
 
         </div>
+
 
         <div class="player-stat">
 
@@ -728,7 +793,9 @@ async function openPlayer(playerId) {
           </div>
 
           <div class="player-stat-value">
-            ${escapeHTML(stat.slg || "—")}
+            ${escapeHTML(
+              stat.slg || "—"
+            )}
           </div>
 
         </div>
@@ -737,9 +804,14 @@ async function openPlayer(playerId) {
 
     `;
 
+
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Player:",
+      error
+    );
+
 
     details.innerHTML =
       `<div class="loading">
@@ -749,34 +821,6 @@ async function openPlayer(playerId) {
   }
 
 }
-
-
-document
-  .getElementById("close-modal")
-  .addEventListener(
-    "click",
-    () => {
-
-      document
-        .getElementById("player-modal")
-        .classList.add("hidden");
-
-    }
-  );
-
-
-document
-  .querySelector(".modal-backdrop")
-  .addEventListener(
-    "click",
-    () => {
-
-      document
-        .getElementById("player-modal")
-        .classList.add("hidden");
-
-    }
-  );
 
 
 // ============================================
@@ -793,7 +837,7 @@ async function loadStats() {
 
   container.innerHTML =
     `<div class="loading">
-      Loading Mets statistics...
+      Loading Mets player statistics...
     </div>`;
 
 
@@ -801,22 +845,23 @@ async function loadStats() {
 
     const data =
       await api(
-        `/api/mets/stats?season=${CURRENT_SEASON}&group=hitting`
+        `/api/mets/stats?season=${CURRENT_SEASON}`
       );
 
 
     const stats =
-      data.stats?.[0]?.splits || [];
+      data.stats || [];
 
 
     if (!stats.length) {
 
       container.innerHTML =
         `<div class="loading">
-          No hitting statistics available.
+          No Mets player statistics found.
         </div>`;
 
       return;
+
     }
 
 
@@ -843,16 +888,21 @@ async function loadStats() {
 
         </thead>
 
+
         <tbody>
 
           ${stats
             .map(split => {
 
               const player =
-                split.player || {};
+                split.player ||
+                split.person ||
+                {};
+
 
               const stat =
-                split.stat || {};
+                split.stat ||
+                {};
 
 
               return `
@@ -865,31 +915,87 @@ async function loadStats() {
                       class="player-link"
                       data-player-id="${player.id}"
                     >
+
                       ${escapeHTML(
                         player.fullName ||
-                        "Unknown"
+                        "Unknown Player"
                       )}
+
                     </button>
 
                   </td>
 
-                  <td>${escapeHTML(stat.gamesPlayed ?? "—")}</td>
 
-                  <td>${escapeHTML(stat.atBats ?? "—")}</td>
+                  <td>
+                    ${escapeHTML(
+                      stat.gamesPlayed ??
+                      "—"
+                    )}
+                  </td>
 
-                  <td>${escapeHTML(stat.hits ?? "—")}</td>
 
-                  <td>${escapeHTML(stat.homeRuns ?? "—")}</td>
+                  <td>
+                    ${escapeHTML(
+                      stat.atBats ??
+                      "—"
+                    )}
+                  </td>
 
-                  <td>${escapeHTML(stat.rbi ?? "—")}</td>
 
-                  <td>${escapeHTML(stat.avg || "—")}</td>
+                  <td>
+                    ${escapeHTML(
+                      stat.hits ??
+                      "—"
+                    )}
+                  </td>
 
-                  <td>${escapeHTML(stat.obp || "—")}</td>
 
-                  <td>${escapeHTML(stat.slg || "—")}</td>
+                  <td>
+                    ${escapeHTML(
+                      stat.homeRuns ??
+                      "—"
+                    )}
+                  </td>
 
-                  <td>${escapeHTML(stat.ops || "—")}</td>
+
+                  <td>
+                    ${escapeHTML(
+                      stat.rbi ??
+                      "—"
+                    )}
+                  </td>
+
+
+                  <td>
+                    ${escapeHTML(
+                      stat.avg ||
+                      "—"
+                    )}
+                  </td>
+
+
+                  <td>
+                    ${escapeHTML(
+                      stat.obp ||
+                      "—"
+                    )}
+                  </td>
+
+
+                  <td>
+                    ${escapeHTML(
+                      stat.slg ||
+                      "—"
+                    )}
+                  </td>
+
+
+                  <td>
+                    ${escapeHTML(
+                      stat.ops ||
+                      "—"
+                    )}
+                  </td>
 
                 </tr>
 
@@ -925,7 +1031,11 @@ async function loadStats() {
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Stats:",
+      error
+    );
+
 
     container.innerHTML =
       `<div class="loading">
@@ -933,6 +1043,7 @@ async function loadStats() {
       </div>`;
 
   }
+
 }
 
 
@@ -950,7 +1061,7 @@ async function loadTransactions() {
 
   container.innerHTML =
     `<div class="loading">
-      Loading transactions...
+      Loading recent Mets transactions...
     </div>`;
 
 
@@ -974,6 +1085,7 @@ async function loadTransactions() {
         </div>`;
 
       return;
+
     }
 
 
@@ -981,11 +1093,30 @@ async function loadTransactions() {
       transactions
         .map(transaction => {
 
-          const player =
-            transaction.player?.fullName ||
-            transaction.player?.firstName
-              ? `${transaction.player.firstName || ""} ${transaction.player.lastName || ""}`.trim()
-              : "Team transaction";
+          let playerName =
+            transaction.player?.fullName;
+
+
+          if (!playerName) {
+
+            const first =
+              transaction.player?.firstName ||
+              "";
+
+            const last =
+              transaction.player?.lastName ||
+              "";
+
+            playerName =
+              `${first} ${last}`.trim();
+
+          }
+
+
+          if (!playerName) {
+            playerName =
+              "Team transaction";
+          }
 
 
           return `
@@ -993,21 +1124,31 @@ async function loadTransactions() {
             <div class="transaction">
 
               <div class="transaction-date">
+
                 ${formatDate(
                   transaction.date
                 )}
+
               </div>
+
 
               <div class="transaction-player">
-                ${escapeHTML(player)}
+
+                ${escapeHTML(
+                  playerName
+                )}
+
               </div>
 
+
               <div class="transaction-type">
+
                 ${escapeHTML(
                   transaction.description ||
                   transaction.typeDesc ||
                   "Transaction"
                 )}
+
               </div>
 
             </div>
@@ -1020,19 +1161,64 @@ async function loadTransactions() {
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Transactions:",
+      error
+    );
+
 
     container.innerHTML =
       `<div class="loading">
-        Unable to load transactions.
+        Unable to load Mets transactions.
       </div>`;
 
   }
+
 }
 
 
 // ============================================
-// BUTTONS
+// MODAL
+// ============================================
+
+document
+  .getElementById("close-modal")
+  .addEventListener(
+    "click",
+    () => {
+
+      document
+        .getElementById(
+          "player-modal"
+        )
+        .classList.add(
+          "hidden"
+        );
+
+    }
+  );
+
+
+document
+  .querySelector(".modal-backdrop")
+  .addEventListener(
+    "click",
+    () => {
+
+      document
+        .getElementById(
+          "player-modal"
+        )
+        .classList.add(
+          "hidden"
+        );
+
+    }
+  );
+
+
+// ============================================
+// REFRESH BUTTONS
 // ============================================
 
 document
@@ -1081,19 +1267,26 @@ document
 
 
 // ============================================
-// INITIAL LOAD
+// START
 // ============================================
 
 async function initialize() {
 
-  console.log("Starting Mets HQ...");
+  console.log(
+    "Starting Mets HQ..."
+  );
+
 
   await Promise.all([
     loadStandings(),
     loadGames()
   ]);
 
-  console.log("Mets HQ ready.");
+
+  console.log(
+    "Mets HQ ready."
+  );
+
 }
 
 
