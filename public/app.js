@@ -1,6 +1,15 @@
 const CURRENT_SEASON = 2026;
 const METS_ID = 121;
 
+let allStats = [];
+let currentStatMode = “hitting”;
+let currentSort = {
+key: null,
+direction: “desc”
+};
+
+let allRosterPlayers = [];
+let currentGameFilter = “all”;
 
 // ============================================================
 // API
@@ -8,28 +17,29 @@ const METS_ID = 121;
 
 async function api(url) {
 
-  const response =
-    await fetch(url);
+const response = await fetch(url, {
+headers: {
+“Accept”: “application/json”
+}
+});
 
-  const data =
-    await response.json();
+let data;
 
-  if (
-    !response.ok ||
-    data.success === false
-  ) {
-
-    throw new Error(
-      data.error ||
-      "Request failed"
-    );
-
-  }
-
-  return data;
-
+try {
+data = await response.json();
+} catch {
+throw new Error(“The server returned invalid JSON.”);
 }
 
+if (!response.ok || data.success === false) {
+throw new Error(
+data?.error ||
+Request failed with status ${response.status}
+);
+}
+
+return data;
+}
 
 // ============================================================
 // HELPERS
@@ -37,97 +47,281 @@ async function api(url) {
 
 function escapeHTML(value) {
 
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-
+return String(value ?? “”)
+.replaceAll(”&”, “&”)
+.replaceAll(”<”, “<”)
+.replaceAll(”>”, “>”)
+.replaceAll(’”’, “"”)
+.replaceAll(”’”, “'”);
 }
-
-
-function formatDate(dateString) {
-
-  if (!dateString) {
-    return "—";
-  }
-
-  const date =
-    new Date(dateString);
-
-  return date.toLocaleDateString(
-    "en-US",
-    {
-      timeZone:
-        "America/New_York",
-      weekday: "short",
-      month: "short",
-      day: "numeric"
-    }
-  );
-
-}
-
 
 function getEasternDate() {
 
-  const parts =
-    new Intl.DateTimeFormat(
-      "en-US",
-      {
-        timeZone:
-          "America/New_York",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit"
-      }
-    ).formatToParts(
-      new Date()
-    );
+const parts = new Intl.DateTimeFormat(
+“en-US”,
+{
+timeZone: “America/New_York”,
+year: “numeric”,
+month: “2-digit”,
+day: “2-digit”
+}
+).formatToParts(new Date());
 
-  const year =
-    parts.find(
-      p => p.type === "year"
-    ).value;
+const year =
+parts.find(p => p.type === “year”)?.value;
 
-  const month =
-    parts.find(
-      p => p.type === "month"
-    ).value;
+const month =
+parts.find(p => p.type === “month”)?.value;
 
-  const day =
-    parts.find(
-      p => p.type === "day"
-    ).value;
+const day =
+parts.find(p => p.type === “day”)?.value;
 
-  return `${year}-${month}-${day}`;
+return ${year}-${month}-${day};
+}
+
+function formatDate(dateString) {
+
+if (!dateString) {
+return “—”;
+}
+
+const date = new Date(dateString);
+
+if (Number.isNaN(date.getTime())) {
+return “—”;
+}
+
+return date.toLocaleDateString(
+“en-US”,
+{
+timeZone: “America/New_York”,
+weekday: “short”,
+month: “short”,
+day: “numeric”
+}
+);
+}
+
+function getTeamId(team) {
+
+if (!team) {
+return null;
+}
+
+if (typeof team === “number”) {
+return team;
+}
+
+if (typeof team === “string”) {
+
+const numeric = Number(team);
+return Number.isFinite(numeric)
+  ? numeric
+  : null;
 
 }
 
+const possibleIds = [
+team.id,
+team.teamId,
+team.team?.id,
+team.team?.teamId
+];
 
-// ============================================================
-// MLB HEADSHOT
-// ============================================================
+for (const value of possibleIds) {
 
-function getPlayerImage(playerId) {
-
-  if (!playerId) {
-
-    return "";
-
-  }
-
-  return (
-    "https://img.mlbstatic.com/" +
-    "mlb-photos/image/upload/" +
-    "w_300,q_auto:good/" +
-    `v1/people/${playerId}/` +
-    "headshot/67/current"
-  );
+const numeric = Number(value);
+if (Number.isFinite(numeric) && numeric > 0) {
+  return numeric;
+}
 
 }
 
+return null;
+}
+
+function getTeamName(team) {
+
+if (!team) {
+return “Unknown Opponent”;
+}
+
+if (typeof team === “string”) {
+return team;
+}
+
+if (typeof team === “number”) {
+return “Unknown Opponent”;
+}
+
+const candidates = [
+team.name,
+team.teamName,
+team.clubName,
+team.shortName,
+team.team?.name,
+team.team?.teamName,
+team.team?.clubName,
+team.team?.shortName
+];
+
+for (const candidate of candidates) {
+
+if (
+  typeof candidate === "string" &&
+  candidate.trim()
+) {
+  return candidate.trim();
+}
+
+}
+
+return “Unknown Opponent”;
+}
+
+function getPlayerName(player) {
+
+return (
+player?.person?.fullName ||
+player?.player?.fullName ||
+player?.fullName ||
+player?.person?.name ||
+player?.name ||
+“Unknown Player”
+);
+}
+
+function getPlayerId(player) {
+
+const candidates = [
+player?.person?.id,
+player?.person?.personId,
+player?.player?.id,
+player?.player?.personId,
+player?.id,
+player?.personId
+];
+
+for (const value of candidates) {
+
+const number = Number(value);
+if (Number.isFinite(number) && number > 0) {
+  return String(number);
+}
+
+}
+
+return “”;
+}
+
+function numberValue(value) {
+
+const number = Number(value);
+
+return Number.isFinite(number)
+? number
+: null;
+}
+
+function displayValue(value) {
+
+return (
+value === null ||
+value === undefined ||
+value === “”
+)
+? “—”
+: String(value);
+}
+
+function normalizeAverage(value) {
+
+if (
+value === null ||
+value === undefined ||
+value === “”
+) {
+return null;
+}
+
+const numeric = Number(value);
+
+return Number.isFinite(numeric)
+? numeric
+: null;
+}
+
+function isPitcher(player) {
+
+const position =
+(
+player?.position?.abbreviation ||
+player?.position?.name ||
+player?.person?.primaryPosition?.abbreviation ||
+“”
+).toLowerCase();
+
+return (
+position === “p” ||
+position.includes(“pitch”)
+);
+}
+
+function isCatcher(player) {
+
+const position =
+(
+player?.position?.abbreviation ||
+player?.position?.name ||
+“”
+).toLowerCase();
+
+return (
+position === “c” ||
+position.includes(“catcher”)
+);
+}
+
+function isInfield(player) {
+
+const position =
+(
+player?.position?.abbreviation ||
+player?.position?.name ||
+“”
+).toLowerCase();
+
+return [
+“1b”,
+“2b”,
+“3b”,
+“ss”,
+“c”
+].includes(position) ||
+position.includes(“first base”) ||
+position.includes(“second base”) ||
+position.includes(“third base”) ||
+position.includes(“shortstop”) ||
+position.includes(“catcher”);
+}
+
+function isOutfield(player) {
+
+const position =
+(
+player?.position?.abbreviation ||
+player?.position?.name ||
+“”
+).toLowerCase();
+
+return [
+“lf”,
+“cf”,
+“rf”,
+“of”
+].includes(position) ||
+position.includes(“outfield”);
+}
 
 // ============================================================
 // NAVIGATION
@@ -135,92 +329,74 @@ function getPlayerImage(playerId) {
 
 function showSection(sectionName) {
 
-  document
-    .querySelectorAll(".section")
-    .forEach(section => {
-
-      section.classList.remove(
-        "active"
-      );
-
-    });
-
-  document
-    .querySelectorAll(".nav-button")
-    .forEach(button => {
-
-      button.classList.remove(
-        "active"
-      );
-
-    });
-
-  const section =
-    document.getElementById(
-      `${sectionName}-section`
-    );
-
-  if (section) {
-
-    section.classList.add(
-      "active"
-    );
-
-  }
-
-  document
-    .querySelectorAll(
-      `[data-section="${sectionName}"]`
-    )
-    .forEach(button => {
-
-      button.classList.add(
-        "active"
-      );
-
-    });
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-
-  if (sectionName === "games") {
-    loadGames();
-  }
-
-  if (sectionName === "roster") {
-    loadRoster();
-  }
-
-  if (sectionName === "stats") {
-    loadStats();
-  }
-
-  if (sectionName === "transactions") {
-    loadTransactions();
-  }
-
-}
-
+document
+.querySelectorAll(”.section”)
+.forEach(section => {
+section.classList.remove(“active”);
+});
 
 document
-  .querySelectorAll("[data-section]")
-  .forEach(button => {
+.querySelectorAll(”.nav-button”)
+.forEach(button => {
+button.classList.remove(“active”);
+});
 
-    button.addEventListener(
-      "click",
-      () => {
+document
+.querySelectorAll([data-section="${sectionName}"])
+.forEach(button => {
+if (button.classList.contains(“nav-button”)) {
+button.classList.add(“active”);
+}
+});
 
-        showSection(
-          button.dataset.section
-        );
+const section =
+document.getElementById(
+${sectionName}-section
+);
 
-      }
-    );
+if (section) {
+section.classList.add(“active”);
+}
 
-  });
+window.scrollTo({
+top: 0,
+behavior: “smooth”
+});
 
+if (sectionName === “games”) {
+loadGames();
+}
+
+if (sectionName === “roster”) {
+loadRoster();
+}
+
+if (sectionName === “stats”) {
+loadStats();
+}
+
+if (sectionName === “transactions”) {
+loadTransactions();
+}
+}
+
+document.addEventListener(“click”, event => {
+
+const button =
+event.target.closest(”[data-section]”);
+
+if (!button) {
+return;
+}
+
+const section =
+button.dataset.section;
+
+if (section) {
+showSection(section);
+}
+
+});
 
 // ============================================================
 // STANDINGS
@@ -228,157 +404,226 @@ document
 
 async function loadStandings() {
 
+try {
+
+const data =
+  await api(
+    `/api/mets/standings?season=${CURRENT_SEASON}`
+  );
+const mets =
+  data?.mets ||
+  data?.team ||
+  data?.standings?.find(
+    team =>
+      Number(team?.team?.id) === METS_ID ||
+      Number(team?.id) === METS_ID
+  );
+if (!mets) {
+  console.warn(
+    "Could not locate Mets standings object.",
+    data
+  );
+  return;
+}
+const wins =
+  numberValue(
+    mets.wins ??
+    mets.record?.wins ??
+    mets.team?.record?.wins
+  );
+const losses =
+  numberValue(
+    mets.losses ??
+    mets.record?.losses ??
+    mets.team?.record?.losses
+  );
+if (
+  wins !== null &&
+  losses !== null
+) {
+  document.getElementById(
+    "record"
+  ).textContent =
+    `${wins}-${losses}`;
+  const percentage =
+    wins + losses > 0
+      ? (wins / (wins + losses))
+          .toFixed(3)
+      : "—";
+  document.getElementById(
+    "record-sub"
+  ).textContent =
+    `Win % ${percentage}`;
+}
+const divisionRank =
+  mets.divisionRank ??
+  mets.rank ??
+  mets.division?.rank;
+document.getElementById(
+  "division-rank"
+).textContent =
+  divisionRank
+    ? `#${divisionRank}`
+    : "—";
+const gamesBack =
+  mets.gamesBack ??
+  mets.divisionGamesBack ??
+  mets.gamesBackInDivision;
+document.getElementById(
+  "games-back"
+).textContent =
+  gamesBack === "0" ||
+  gamesBack === "0.0" ||
+  gamesBack === 0 ||
+  gamesBack === 0.0
+    ? "1st place"
+    : `${gamesBack ?? "—"} GB`;
+let lastTen =
+  mets.lastTen ??
+  mets.last10 ??
+  mets.record?.lastTen ??
+  mets.record?.last10;
+let lastTenText = "—";
+if (typeof lastTen === "string") {
+  lastTenText =
+    lastTen.trim() || "—";
+} else if (lastTen) {
+  const lastTenWins =
+    numberValue(
+      lastTen.wins ??
+      lastTen.winsLastTen ??
+      lastTen.w
+    );
+  const lastTenLosses =
+    numberValue(
+      lastTen.losses ??
+      lastTen.lossesLastTen ??
+      lastTen.l
+    );
+  if (
+    lastTenWins !== null &&
+    lastTenLosses !== null
+  ) {
+    lastTenText =
+      `${lastTenWins}-${lastTenLosses}`;
+  }
+}
+/*
+  FALLBACK:
+  If the standings endpoint doesn't provide Last 10,
+  calculate it directly from completed Mets games.
+*/
+if (
+  lastTenText === "—" ||
+  lastTenText === "0-0"
+) {
   try {
-
-    const data =
+    const today =
+      getEasternDate();
+    const end =
+      new Date(
+        `${today}T23:59:59`
+      );
+    const start =
+      new Date(end);
+    start.setDate(
+      start.getDate() - 30
+    );
+    const startDate =
+      start
+        .toISOString()
+        .split("T")[0];
+    const dataGames =
       await api(
-        `/api/mets/standings?season=${CURRENT_SEASON}`
+        `/api/mets/games?startDate=${startDate}&endDate=${today}`
       );
-
-    const mets =
-      data.mets;
-
-    if (!mets) {
-      return;
-    }
-
-    const wins =
-      Number(mets.wins) || 0;
-
-    const losses =
-      Number(mets.losses) || 0;
-
-    const record =
-      document.getElementById(
-        "record"
-      );
-
-    if (record) {
-
-      record.textContent =
-        `${wins}-${losses}`;
-
-    }
-
-    const recordSub =
-      document.getElementById(
-        "record-sub"
-      );
-
-    if (recordSub) {
-
-      recordSub.textContent =
-        `Win % ${
-          mets.winningPercentage ||
-          "—"
-        }`;
-
-    }
-
-    const divisionRank =
-      document.getElementById(
-        "division-rank"
-      );
-
-    if (divisionRank) {
-
-      divisionRank.textContent =
-        mets.divisionRank
-          ? `#${mets.divisionRank}`
-          : "—";
-
-    }
-
-    const gamesBack =
-      document.getElementById(
-        "games-back"
-      );
-
-    if (gamesBack) {
-
-      gamesBack.textContent =
-        (
-          mets.gamesBack === "0.0" ||
-          mets.gamesBack === "0"
+    const games =
+      Array.isArray(dataGames?.games)
+        ? dataGames.games
+        : [];
+    const completed =
+      games
+        .filter(game => {
+          const state =
+            game?.status?.abstractGameState;
+          return (
+            state === "Final" ||
+            state === "Completed"
+          );
+        })
+        .sort(
+          (a, b) =>
+            new Date(b.gameDate) -
+            new Date(a.gameDate)
         )
-          ? "1st place"
-          : `${mets.gamesBack || "—"} GB`;
-
+        .slice(0, 10);
+    let wins10 = 0;
+    let losses10 = 0;
+    completed.forEach(game => {
+      const info =
+        getGameInfo(game);
+      const metsScore =
+        numberValue(
+          info.mets?.score
+        );
+      const opponentScore =
+        numberValue(
+          info.opponent?.score
+        );
+      if (
+        metsScore === null ||
+        opponentScore === null
+      ) {
+        return;
+      }
+      if (
+        metsScore > opponentScore
+      ) {
+        wins10++;
+      } else if (
+        metsScore < opponentScore
+      ) {
+        losses10++;
+      }
+    });
+    if (
+      completed.length > 0
+    ) {
+      lastTenText =
+        `${wins10}-${losses10}`;
     }
-
-    const streak =
-      document.getElementById(
-        "streak"
-      );
-
-    if (streak) {
-
-      streak.textContent =
-        mets.streak?.streakCode ||
-        "—";
-
-    }
-
-    // --------------------------------------------------------
-    // Last 10 is loaded separately below.
-    // --------------------------------------------------------
-
-    await loadLast10();
-
-  } catch (error) {
-
-    console.error(
-      "Standings:",
-      error
+  } catch (fallbackError) {
+    console.warn(
+      "Last 10 fallback failed:",
+      fallbackError
     );
-
   }
+}
+document.getElementById(
+  "last-ten"
+).textContent =
+  lastTenText;
+const streak =
+  mets.streak?.streakCode ||
+  mets.streakCode ||
+  mets.streak;
+document.getElementById(
+  "streak"
+).textContent =
+  typeof streak === "string"
+    ? streak
+    : "—";
+
+} catch (error) {
+
+console.error(
+  "Standings:",
+  error
+);
 
 }
 
-
-// ============================================================
-// LAST 10
-// ============================================================
-
-async function loadLast10() {
-
-  try {
-
-    const data =
-      await api(
-        "/api/mets/last10"
-      );
-
-    const element =
-      document.getElementById(
-        "last-ten"
-      );
-
-    if (!element) {
-      return;
-    }
-
-    const wins =
-      Number(data.wins) || 0;
-
-    const losses =
-      Number(data.losses) || 0;
-
-    element.textContent =
-      `${wins}-${losses}`;
-
-  } catch (error) {
-
-    console.error(
-      "Last 10:",
-      error
-    );
-
-  }
-
 }
-
 
 // ============================================================
 // GAMES
@@ -386,1614 +631,1672 @@ async function loadLast10() {
 
 function getGameInfo(game) {
 
-  const home =
-    game?.teams?.home || {};
+const home =
+game?.teams?.home ||
+game?.home ||
+{};
 
-  const away =
-    game?.teams?.away || {};
+const away =
+game?.teams?.away ||
+game?.away ||
+{};
 
-  const homeId =
-    Number(
-      home?.team?.id ||
-      home?.team?.teamId ||
-      home?.id
-    );
+const homeId =
+getTeamId(home);
 
-  const awayId =
-    Number(
-      away?.team?.id ||
-      away?.team?.teamId ||
-      away?.id
-    );
+const awayId =
+getTeamId(away);
 
-  let metsIsHome;
+let metsIsHome = null;
 
-  if (homeId === METS_ID) {
+if (homeId === METS_ID) {
+metsIsHome = true;
+}
 
-    metsIsHome = true;
+if (awayId === METS_ID) {
+metsIsHome = false;
+}
 
-  } else if (awayId === METS_ID) {
+/*
+Some MLB responses put the team object
+inside another nested team object.
+*/
 
-    metsIsHome = false;
+if (metsIsHome === null) {
 
-  } else {
-
-    metsIsHome =
-      String(
-        home?.team?.name ||
-        ""
-      )
-        .toLowerCase()
-        .includes("mets");
-
-  }
-
-  const mets =
-    metsIsHome
-      ? home
-      : away;
-
-  const opponent =
-    metsIsHome
-      ? away
-      : home;
-
-  return {
-    metsIsHome,
-    mets,
-    opponent
-  };
+const homeName =
+  getTeamName(home).toLowerCase();
+const awayName =
+  getTeamName(away).toLowerCase();
+if (
+  homeName.includes("mets") ||
+  homeName.includes("new york")
+) {
+  metsIsHome = true;
+}
+if (
+  awayName.includes("mets") ||
+  awayName.includes("new york")
+) {
+  metsIsHome = false;
+}
 
 }
 
+const mets =
+metsIsHome === true
+? home
+: metsIsHome === false
+? away
+: {};
 
-function getTeamName(team) {
+const opponent =
+metsIsHome === true
+? away
+: metsIsHome === false
+? home
+: {};
 
-  if (!team) {
-    return "Unknown Opponent";
-  }
-
-  if (typeof team === "string") {
-    return team;
-  }
-
-  if (team.name) {
-    return team.name;
-  }
-
-  if (team.teamName) {
-    return team.teamName;
-  }
-
-  if (team.clubName) {
-    return team.clubName;
-  }
-
-  if (team.shortName) {
-    return team.shortName;
-  }
-
-  if (team.team) {
-    return getTeamName(
-      team.team
-    );
-  }
-
-  return "Unknown Opponent";
+return {
+metsIsHome,
+mets,
+opponent
+};
 
 }
-
 
 function renderGame(game) {
 
-  const {
-    metsIsHome,
-    mets,
-    opponent
-  } =
-    getGameInfo(game);
+const {
+metsIsHome,
+mets,
+opponent
+} =
+getGameInfo(game);
 
-  const opponentName =
-    getTeamName(
-      opponent?.team ||
-      opponent
-    );
+let opponentName =
+getTeamName(opponent);
 
-  const metsScore =
-    Number.isFinite(
-      Number(mets?.score)
-    )
-      ? Number(mets.score)
-      : null;
+/*
+Handle alternate MLB structures.
+*/
 
-  const opponentScore =
-    Number.isFinite(
-      Number(opponent?.score)
-    )
-      ? Number(opponent.score)
-      : null;
+if (
+opponentName === “Unknown Opponent”
+) {
 
-  const isFinal =
-    game.status?.abstractGameState ===
-    "Final";
-
-  let resultClass = "";
-
-  if (
-    isFinal &&
-    metsScore !== null &&
-    opponentScore !== null
-  ) {
-
-    if (
-      metsScore >
-      opponentScore
-    ) {
-
-      resultClass = "win";
-
-    } else if (
-      metsScore <
-      opponentScore
-    ) {
-
-      resultClass = "loss";
-
-    }
-
-  }
-
-  const scoreText =
-    metsScore !== null &&
-    opponentScore !== null
-      ? `${metsScore} - ${opponentScore}`
-      : "—";
-
-  const status =
-    game.status?.detailedState ||
-    game.status?.abstractGameState ||
-    "Scheduled";
-
-  const location =
-    metsIsHome
-      ? "vs."
-      : "@";
-
-  return `
-
-    <div class="game">
-
-      <div class="game-date">
-        ${formatDate(
-          game.gameDate
-        )}
-      </div>
-
-      <div class="game-teams">
-
-        <span class="team-name mets">
-          Mets
-        </span>
-
-        <span>
-          ${location}
-        </span>
-
-        <span class="team-name">
-          ${escapeHTML(
-            opponentName
-          )}
-        </span>
-
-        <span
-          class="game-score ${resultClass}"
-        >
-          ${scoreText}
-        </span>
-
-      </div>
-
-      <div class="game-status">
-        ${escapeHTML(status)}
-      </div>
-
-    </div>
-
-  `;
+opponentName =
+  getTeamName(
+    opponent?.team
+  );
 
 }
 
+const metsScore =
+numberValue(
+mets?.score ??
+mets?.runs ??
+mets?.team?.score
+);
+
+const opponentScore =
+numberValue(
+opponent?.score ??
+opponent?.runs ??
+opponent?.team?.score
+);
+
+const state =
+game?.status?.abstractGameState ||
+game?.status?.statusCode ||
+“”;
+
+const isFinal =
+state === “Final” ||
+state === “Completed”;
+
+let resultClass = “”;
+
+if (
+isFinal &&
+metsScore !== null &&
+opponentScore !== null
+) {
+
+if (
+  metsScore > opponentScore
+) {
+  resultClass = "win";
+}
+if (
+  metsScore < opponentScore
+) {
+  resultClass = "loss";
+}
+
+}
+
+let scoreText = “—”;
+
+if (
+metsScore !== null &&
+opponentScore !== null
+) {
+
+scoreText =
+  `${metsScore} - ${opponentScore}`;
+
+}
+
+let status =
+game?.status?.detailedState ||
+game?.status?.abstractGameState ||
+“Scheduled”;
+
+if (
+status === “Final”
+) {
+status = “Final”;
+}
+
+const location =
+metsIsHome === true
+? “vs.”
+: metsIsHome === false
+? “@”
+: “vs.”;
+
+return `
+
+<div
+  class="game"
+  data-game-state="${isFinal ? "completed" : "upcoming"}"
+>
+  <div class="game-date">
+    ${escapeHTML(
+      formatDate(game?.gameDate)
+    )}
+  </div>
+  <div class="game-teams">
+    <span class="team-name mets">
+      Mets
+    </span>
+    <span>
+      ${location}
+    </span>
+    <span class="team-name">
+      ${escapeHTML(
+        opponentName
+      )}
+    </span>
+    <span class="game-score ${resultClass}">
+      ${escapeHTML(
+        scoreText
+      )}
+    </span>
+  </div>
+  <div class="game-status">
+    ${escapeHTML(status)}
+  </div>
+</div>
+
+`;
+}
 
 async function loadGames() {
 
-  const container =
-    document.getElementById(
-      "games-list"
-    );
+const container =
+document.getElementById(
+“games-list”
+);
 
-  const homeContainer =
-    document.getElementById(
-      "home-games"
-    );
+const homeContainer =
+document.getElementById(
+“home-games”
+);
 
-  if (container) {
+if (container) {
 
-    container.innerHTML =
-      `<div class="loading">
-        Loading games...
-      </div>`;
-
-  }
-
-  if (homeContainer) {
-
-    homeContainer.innerHTML =
-      `<div class="loading">
-        Loading Mets games...
-      </div>`;
-
-  }
-
-  try {
-
-    const today =
-      getEasternDate();
-
-    const start =
-      new Date(
-        `${today}T00:00:00-04:00`
-      );
-
-    const end =
-      new Date(start);
-
-    end.setDate(
-      end.getDate() + 21
-    );
-
-    const endDate =
-      end
-        .toISOString()
-        .split("T")[0];
-
-    const data =
-      await api(
-        `/api/mets/games?startDate=${today}&endDate=${endDate}`
-      );
-
-    let games =
-      data.games || [];
-
-    games =
-      games.filter(
-        game => {
-
-          if (!game.gameDate) {
-            return false;
-          }
-
-          return (
-            new Date(game.gameDate) >=
-            start
-          );
-
-        }
-      );
-
-    games.sort(
-      (a, b) =>
-        new Date(a.gameDate) -
-        new Date(b.gameDate)
-    );
-
-    if (!games.length) {
-
-      const message =
-        `<div class="loading">
-          No Mets games found.
-        </div>`;
-
-      if (container) {
-        container.innerHTML =
-          message;
-      }
-
-      if (homeContainer) {
-        homeContainer.innerHTML =
-          message;
-      }
-
-      return;
-
-    }
-
-    if (container) {
-
-      container.innerHTML =
-        games
-          .map(renderGame)
-          .join("");
-
-    }
-
-    if (homeContainer) {
-
-      homeContainer.innerHTML =
-        games
-          .slice(0, 5)
-          .map(renderGame)
-          .join("");
-
-    }
-
-  } catch (error) {
-
-    console.error(
-      "Games:",
-      error
-    );
-
-    const message =
-      `<div class="loading">
-        Unable to load Mets games.
-      </div>`;
-
-    if (container) {
-      container.innerHTML =
-        message;
-    }
-
-    if (homeContainer) {
-      homeContainer.innerHTML =
-        message;
-    }
-
-  }
+container.innerHTML =
+  `<div class="loading">
+    Loading games...
+  </div>`;
 
 }
 
+if (homeContainer) {
+
+homeContainer.innerHTML =
+  `<div class="loading">
+    Loading Mets games...
+  </div>`;
+
+}
+
+try {
+
+const today =
+  getEasternDate();
+/*
+  Get enough history to support:
+  - recent results
+  - Last 10
+  - upcoming schedule
+*/
+const startDateObj =
+  new Date(
+    `${today}T00:00:00`
+  );
+startDateObj.setDate(
+  startDateObj.getDate() - 14
+);
+const endDateObj =
+  new Date(
+    `${today}T00:00:00`
+  );
+endDateObj.setDate(
+  endDateObj.getDate() + 21
+);
+const startDate =
+  startDateObj
+    .toISOString()
+    .split("T")[0];
+const endDate =
+  endDateObj
+    .toISOString()
+    .split("T")[0];
+const data =
+  await api(
+    `/api/mets/games?startDate=${startDate}&endDate=${endDate}`
+  );
+let games =
+  Array.isArray(data?.games)
+    ? data.games
+    : [];
+games =
+  games.filter(game => {
+    if (!game?.gameDate) {
+      return false;
+    }
+    return (
+      new Date(game.gameDate) >=
+      new Date(
+        `${startDateObj.toISOString()}`
+      )
+    );
+  });
+games.sort(
+  (a, b) =>
+    new Date(a.gameDate) -
+    new Date(b.gameDate)
+);
+if (!games.length) {
+  const message =
+    `<div class="loading">
+      No Mets games found.
+    </div>`;
+  if (container) {
+    container.innerHTML = message;
+  }
+  if (homeContainer) {
+    homeContainer.innerHTML = message;
+  }
+  return;
+}
+/*
+  Home page gets the next/recent five
+  most relevant games.
+*/
+const todayStart =
+  new Date(
+    `${today}T00:00:00`
+  );
+const upcoming =
+  games.filter(
+    game =>
+      new Date(game.gameDate) >=
+      todayStart
+  );
+const recent =
+  games
+    .filter(
+      game =>
+        new Date(game.gameDate) <
+        todayStart
+    )
+    .sort(
+      (a,b) =>
+        new Date(b.gameDate) -
+        new Date(a.gameDate)
+    );
+const homeGames =
+  [
+    ...upcoming.slice(0, 5)
+  ];
+if (
+  homeGames.length < 5
+) {
+  homeGames.push(
+    ...recent.slice(
+      0,
+      5 - homeGames.length
+    )
+  );
+}
+homeGames.sort(
+  (a,b) =>
+    new Date(a.gameDate) -
+    new Date(b.gameDate)
+);
+if (container) {
+  container.innerHTML =
+    games
+      .map(renderGame)
+      .join("");
+}
+if (homeContainer) {
+  homeContainer.innerHTML =
+    homeGames
+      .map(renderGame)
+      .join("");
+}
+applyGameFilter();
+createStatOfDay(games);
+
+} catch (error) {
+
+console.error(
+  "Games:",
+  error
+);
+const message =
+  `<div class="error-box">
+    Unable to load Mets games right now.
+  </div>`;
+if (container) {
+  container.innerHTML = message;
+}
+if (homeContainer) {
+  homeContainer.innerHTML = message;
+}
+
+}
+
+}
+
+// ============================================================
+// GAME FILTERS
+// ============================================================
+
+function applyGameFilter() {
+
+document
+.querySelectorAll(
+“#games-list .game”
+)
+.forEach(game => {
+
+  const state =
+    game.dataset.gameState;
+  let visible = true;
+  if (
+    currentGameFilter ===
+    "completed"
+  ) {
+    visible =
+      state === "completed";
+  }
+  if (
+    currentGameFilter ===
+    "upcoming"
+  ) {
+    visible =
+      state === "upcoming";
+  }
+  game.style.display =
+    visible
+      ? ""
+      : "none";
+});
+
+}
+
+document.addEventListener(
+“click”,
+event => {
+
+const button =
+  event.target.closest(
+    "[data-game-filter]"
+  );
+if (!button) {
+  return;
+}
+currentGameFilter =
+  button.dataset.gameFilter;
+document
+  .querySelectorAll(
+    "[data-game-filter]"
+  )
+  .forEach(
+    item =>
+      item.classList.remove(
+        "active"
+      )
+  );
+button.classList.add("active");
+applyGameFilter();
+
+}
+);
 
 // ============================================================
 // ROSTER
-//
-// ONE GROUP.
-// No starters.
-// No relievers.
-// Everyone together.
 // ============================================================
+
+function rosterCategory(player) {
+
+if (isPitcher(player)) {
+return “pitchers”;
+}
+
+if (isInfield(player)) {
+return “infield”;
+}
+
+if (isOutfield(player)) {
+return “outfield”;
+}
+
+return “infield”;
+}
 
 function renderRosterPlayer(player) {
 
-  const person =
-    player.person || {};
+const person =
+player?.person || player;
 
-  const playerId =
-    person.id;
+const playerId =
+getPlayerId(player);
 
-  const number =
-    player.jerseyNumber ||
-    person.primaryNumber ||
-    "—";
+const number =
+player?.jerseyNumber ||
+person?.primaryNumber ||
+“—”;
 
-  const position =
-    player.position?.abbreviation ||
-    player.position?.name ||
-    "—";
+const position =
+player?.position?.abbreviation ||
+player?.position?.name ||
+person?.primaryPosition?.abbreviation ||
+“—”;
 
-  const image =
-    getPlayerImage(
-      playerId
-    );
+return `
 
-  return `
-
-    <div
-      class="player-card roster-player-card"
-      data-player-id="${escapeHTML(
-        playerId
-      )}"
-    >
-
-      <div class="roster-photo-wrap">
-
-        ${
-          image
-            ? `
-              <img
-                class="roster-player-photo"
-                src="${image}"
-                alt="${escapeHTML(
-                  person.fullName ||
-                  "Mets player"
-                )}"
-                loading="lazy"
-                onerror="
-                  this.style.display='none';
-                  this.nextElementSibling.style.display='flex';
-                "
-              >
-
-              <div
-                class="roster-photo-placeholder"
-                style="display:none;"
-              >
-                ${escapeHTML(
-                  person.fullName ||
-                  "Player"
-                )}
-              </div>
-            `
-            : `
-              <div
-                class="roster-photo-placeholder"
-              >
-                ${escapeHTML(
-                  person.fullName ||
-                  "Player"
-                )}
-              </div>
-            `
-        }
-
-      </div>
-
-      <div class="player-top">
-
-        <div class="player-number">
-          ${escapeHTML(number)}
-        </div>
-
-        <div>
-
-          <div class="player-name">
-            ${escapeHTML(
-              person.fullName ||
-              "Unknown Player"
-            )}
-          </div>
-
-          <div class="player-position">
-            ${escapeHTML(position)}
-          </div>
-
-        </div>
-
-      </div>
-
+<div
+  class="player-card"
+  data-player-id="${escapeHTML(playerId)}"
+  data-player-name="${escapeHTML(
+    getPlayerName(player).toLowerCase()
+  )}"
+>
+  <div class="player-top">
+    <div class="player-number">
+      ${escapeHTML(number)}
     </div>
+    <div>
+      <div class="player-name">
+        ${escapeHTML(
+          getPlayerName(player)
+        )}
+      </div>
+      <div class="player-position">
+        ${escapeHTML(position)}
+      </div>
+    </div>
+  </div>
+</div>
 
-  `;
-
+`;
 }
 
+function renderRosterSection(
+title,
+players
+) {
+
+if (!players.length) {
+return “”;
+}
+
+return `
+
+<div class="roster-group">
+  <h2 class="roster-group-title">
+    ${escapeHTML(title)}
+  </h2>
+  <div class="roster-grid-section">
+    ${players
+      .map(renderRosterPlayer)
+      .join("")}
+  </div>
+</div>
+
+`;
+}
 
 async function loadRoster() {
 
-  const container =
-    document.getElementById(
-      "roster-grid"
-    );
+const container =
+document.getElementById(
+“roster-grid”
+);
 
-  if (!container) {
-    return;
-  }
+if (!container) {
+return;
+}
 
-  container.innerHTML =
-    `<div class="loading">
-      Loading active Mets roster...
-    </div>`;
+container.innerHTML =
+<div class="loading"> Loading active Mets roster... </div>;
 
-  try {
+try {
 
-    const data =
-      await api(
-        `/api/mets/roster?season=${CURRENT_SEASON}`
-      );
-
-    const roster =
-      data.roster || [];
-
-    if (!roster.length) {
-
-      container.innerHTML =
-        `<div class="loading">
-          No active roster found.
-        </div>`;
-
-      return;
-
+const data =
+  await api(
+    `/api/mets/roster?season=${CURRENT_SEASON}`
+  );
+let roster =
+  Array.isArray(data?.roster)
+    ? data.roster
+    : [];
+/*
+  Remove obvious duplicates.
+*/
+const seen =
+  new Set();
+roster =
+  roster.filter(player => {
+    const id =
+      getPlayerId(player);
+    const name =
+      getPlayerName(player);
+    const key =
+      id || name;
+    if (seen.has(key)) {
+      return false;
     }
+    seen.add(key);
+    return true;
+  });
+allRosterPlayers =
+  roster;
+renderRoster();
 
-    // Sort alphabetically by last name.
-    roster.sort(
-      (a, b) => {
+} catch (error) {
 
-        const aName =
-          (
-            a.person?.lastName ||
-            a.person?.fullName ||
-            ""
-          ).toLowerCase();
-
-        const bName =
-          (
-            b.person?.lastName ||
-            b.person?.fullName ||
-            ""
-          ).toLowerCase();
-
-        return aName.localeCompare(
-          bName
-        );
-
-      }
-    );
-
-    container.innerHTML =
-      roster
-        .map(
-          renderRosterPlayer
-        )
-        .join("");
-
-    container
-      .querySelectorAll(
-        ".player-card"
-      )
-      .forEach(card => {
-
-        card.addEventListener(
-          "click",
-          () => {
-
-            openPlayer(
-              card.dataset.playerId
-            );
-
-          }
-        );
-
-      });
-
-  } catch (error) {
-
-    console.error(
-      "Roster:",
-      error
-    );
-
-    container.innerHTML =
-      `<div class="loading">
-        Unable to load active Mets roster.
-      </div>`;
-
-  }
+console.error(
+  "Roster:",
+  error
+);
+container.innerHTML =
+  `<div class="error-box">
+    Unable to load active Mets roster.
+  </div>`;
 
 }
 
+}
+
+function renderRoster() {
+
+const container =
+document.getElementById(
+“roster-grid”
+);
+
+if (!container) {
+return;
+}
+
+const search =
+(
+document.getElementById(
+“roster-search”
+)?.value ||
+“”
+)
+.trim()
+.toLowerCase();
+
+let roster =
+allRosterPlayers.filter(
+player => {
+
+    if (!search) {
+      return true;
+    }
+    return getPlayerName(
+      player
+    )
+      .toLowerCase()
+      .includes(search);
+  }
+);
+
+const pitchers =
+roster.filter(
+p =>
+rosterCategory(p) ===
+“pitchers”
+);
+
+const infield =
+roster.filter(
+p =>
+rosterCategory(p) ===
+“infield”
+);
+
+const outfield =
+roster.filter(
+p =>
+rosterCategory(p) ===
+“outfield”
+);
+
+container.innerHTML =
+
+renderRosterSection(
+  "Pitchers",
+  pitchers
+) +
+renderRosterSection(
+  "Infield",
+  infield
+) +
+renderRosterSection(
+  "Outfield",
+  outfield
+);
+
+if (!container.innerHTML.trim()) {
+
+container.innerHTML =
+  `<div class="loading">
+    No players match your search.
+  </div>`;
+
+}
+
+}
+
+document.addEventListener(
+“input”,
+event => {
+
+if (
+  event.target.id ===
+  "roster-search"
+) {
+  renderRoster();
+}
+
+}
+);
+
+document.addEventListener(
+“click”,
+event => {
+
+const card =
+  event.target.closest(
+    ".player-card"
+  );
+if (!card) {
+  return;
+}
+const id =
+  card.dataset.playerId;
+if (id) {
+  openPlayer(id);
+}
+
+}
+);
+
+// ============================================================
+// STATS
+// ============================================================
+
+function extractStatArray(data) {
+
+if (
+Array.isArray(data?.stats)
+) {
+return data.stats;
+}
+
+if (
+Array.isArray(data?.splits)
+) {
+return data.splits;
+}
+
+if (
+Array.isArray(data)
+) {
+return data;
+}
+
+return [];
+}
+
+function getStatObject(split) {
+
+return (
+split?.stat ||
+split?.stats ||
+split ||
+{}
+);
+}
+
+function getStatPlayer(split) {
+
+return (
+split?.player ||
+split?.person ||
+split?.playerInfo ||
+{}
+);
+}
+
+function isFormerPlayer(split) {
+
+/*
+Prefer explicit API information.
+*/
+
+if (
+split?.isFormer === true ||
+split?.former === true ||
+split?.active === false
+) {
+return true;
+}
+
+const team =
+split?.team ||
+split?.teamInfo;
+
+if (
+team &&
+Number(team.id) &&
+Number(team.id) !== METS_ID
+) {
+return true;
+}
+
+/*
+If the stats endpoint only returns
+current Mets players, this defaults
+to Active Mets.
+*/
+
+return false;
+}
+
+function statNumber(
+stat,
+keys
+) {
+
+for (const key of keys) {
+
+if (
+  stat?.[key] !== undefined &&
+  stat?.[key] !== null &&
+  stat?.[key] !== ""
+) {
+  const number =
+    Number(stat[key]);
+  if (Number.isFinite(number)) {
+    return number;
+  }
+}
+
+}
+
+return null;
+}
+
+function prepareStatRecord(split) {
+
+const stat =
+getStatObject(split);
+
+const player =
+getStatPlayer(split);
+
+const name =
+getPlayerName({
+…split,
+player
+});
+
+const id =
+getPlayerId({
+…split,
+player
+});
+
+return {
+raw: split,
+
+player,
+id,
+name,
+active:
+  !isFormerPlayer(split),
+G:
+  statNumber(
+    stat,
+    [
+      "gamesPlayed",
+      "games",
+      "G"
+    ]
+  ),
+AB:
+  statNumber(
+    stat,
+    [
+      "atBats",
+      "AB"
+    ]
+  ),
+H:
+  statNumber(
+    stat,
+    [
+      "hits",
+      "H"
+    ]
+  ),
+HR:
+  statNumber(
+    stat,
+    [
+      "homeRuns",
+      "HR"
+    ]
+  ),
+RBI:
+  statNumber(
+    stat,
+    [
+      "rbi",
+      "RBI"
+    ]
+  ),
+AVG:
+  normalizeAverage(
+    stat.avg ??
+    stat.AVG
+  ),
+OBP:
+  normalizeAverage(
+    stat.obp ??
+    stat.OBP
+  ),
+SLG:
+  normalizeAverage(
+    stat.slg ??
+    stat.SLG
+  ),
+OPS:
+  normalizeAverage(
+    stat.ops ??
+    stat.OPS
+  ),
+IP:
+  statNumber(
+    stat,
+    [
+      "inningsPitched",
+      "IP"
+    ]
+  ),
+W:
+  statNumber(
+    stat,
+    [
+      "wins",
+      "W"
+    ]
+  ),
+L:
+  statNumber(
+    stat,
+    [
+      "losses",
+      "L"
+    ]
+  ),
+ERA:
+  statNumber(
+    stat,
+    [
+      "era",
+      "ERA"
+    ]
+  ),
+WHIP:
+  statNumber(
+    stat,
+    [
+      "whip",
+      "WHIP"
+    ]
+  ),
+SO:
+  statNumber(
+    stat,
+    [
+      "strikeOuts",
+      "strikeouts",
+      "SO"
+    ]
+  ),
+BB:
+  statNumber(
+    stat,
+    [
+      "baseOnBalls",
+      "walks",
+      "BB"
+    ]
+  )
+
+};
+
+}
+
+function formatStat(
+value,
+decimals = 0
+) {
+
+if (
+value === null ||
+value === undefined ||
+Number.isNaN(value)
+) {
+return “—”;
+}
+
+if (
+decimals === 0
+) {
+return String(
+Math.round(value)
+);
+}
+
+return Number(value)
+.toFixed(decimals)
+.replace(/^0./, “.”);
+}
+
+function renderStatsTable(
+records,
+type,
+title
+) {
+
+if (!records.length) {
+
+return `
+  <div class="stats-block">
+    <div class="stats-block-title">
+      ${escapeHTML(title)}
+    </div>
+    <div class="loading">
+      No statistics available.
+    </div>
+  </div>
+`;
+
+}
+
+const isHitting =
+type === “hitting”;
+
+const columns =
+isHitting
+? [
+[“name”, “PLAYER”],
+[“G”, “G”],
+[“AB”, “AB”],
+[“H”, “H”],
+[“HR”, “HR”],
+[“RBI”, “RBI”],
+[“AVG”, “AVG”],
+[“OBP”, “OBP”],
+[“SLG”, “SLG”],
+[“OPS”, “OPS”]
+]
+: [
+[“name”, “PLAYER”],
+[“G”, “G”],
+[“IP”, “IP”],
+[“W”, “W”],
+[“L”, “L”],
+[“ERA”, “ERA”],
+[“WHIP”, “WHIP”],
+[“SO”, “SO”],
+[“BB”, “BB”]
+];
+
+const rows =
+records
+.map(record => {
+
+    return `
+      <tr>
+        <td>
+          ${
+            record.id
+              ? `
+                <button
+                  class="player-link"
+                  data-player-id="${escapeHTML(record.id)}"
+                >
+                  ${escapeHTML(record.name)}
+                </button>
+              `
+              : escapeHTML(
+                  record.name
+                )
+          }
+          ${
+            record.active
+              ? `<span class="active-badge">ACTIVE</span>`
+              : ""
+          }
+        </td>
+        ${columns
+          .slice(1)
+          .map(([key]) => {
+            let value =
+              record[key];
+            if (
+              [
+                "AVG",
+                "OBP",
+                "SLG",
+                "OPS"
+              ].includes(key)
+            ) {
+              value =
+                formatStat(
+                  value,
+                  3
+                );
+            }
+            else if (
+              key === "ERA" ||
+              key === "WHIP"
+            ) {
+              value =
+                formatStat(
+                  value,
+                  2
+                );
+            }
+            else if (
+              key === "IP"
+            ) {
+              value =
+                value === null
+                  ? "—"
+                  : String(value);
+            }
+            else {
+              value =
+                formatStat(
+                  value,
+                  0
+                );
+            }
+            return `
+              <td>
+                ${escapeHTML(value)}
+              </td>
+            `;
+          })
+          .join("")}
+      </tr>
+    `;
+  })
+  .join("");
+
+return `
+
+<div class="stats-block">
+  <div class="stats-block-title">
+    ${escapeHTML(title)}
+  </div>
+  <table class="stats-table">
+    <thead>
+      <tr>
+        ${columns
+          .map(
+            ([key, label]) => {
+              const active =
+                currentSort.key ===
+                key;
+              const arrow =
+                active
+                  ? (
+                      currentSort.direction ===
+                      "asc"
+                        ? "↑"
+                        : "↓"
+                    )
+                  : "";
+              return `
+                <th
+                  data-sort-key="${escapeHTML(key)}"
+                >
+                  ${escapeHTML(label)}
+                  ${
+                    arrow
+                      ? `<span class="sort-arrow">${arrow}</span>`
+                      : ""
+                  }
+                </th>
+              `;
+            }
+          )
+          .join("")}
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
+</div>
+
+`;
+}
+
+function renderStats() {
+
+const container =
+document.getElementById(
+“stats-table-container”
+);
+
+if (!container) {
+return;
+}
+
+const search =
+(
+document.getElementById(
+“stats-search”
+)?.value ||
+“”
+)
+.trim()
+.toLowerCase();
+
+let records =
+allStats.filter(record => {
+
+  if (!search) {
+    return true;
+  }
+  return record.name
+    .toLowerCase()
+    .includes(search);
+});
+
+if (
+currentSort.key
+) {
+
+const key =
+  currentSort.key;
+records.sort(
+  (a, b) => {
+    if (key === "name") {
+      return currentSort.direction === "asc"
+        ? a.name.localeCompare(b.name)
+        : b.name.localeCompare(a.name);
+    }
+    const av =
+      a[key] === null ||
+      a[key] === undefined
+        ? -Infinity
+        : Number(a[key]);
+    const bv =
+      b[key] === null ||
+      b[key] === undefined
+        ? -Infinity
+        : Number(b[key]);
+    return currentSort.direction === "asc"
+      ? av - bv
+      : bv - av;
+  }
+);
+
+}
+
+/*
+Put active players before former players
+when there is no explicit numeric sort.
+*/
+
+if (!currentSort.key) {
+
+records.sort(
+  (a,b) => {
+    if (
+      a.active !==
+      b.active
+    ) {
+      return a.active
+        ? -1
+        : 1;
+    }
+    return a.name.localeCompare(
+      b.name
+    );
+  }
+);
+
+}
+
+const active =
+records.filter(
+r => r.active
+);
+
+const former =
+records.filter(
+r => !r.active
+);
+
+container.innerHTML =
+
+renderStatsTable(
+  active,
+  currentStatMode,
+  "Active Mets"
+) +
+renderStatsTable(
+  former,
+  currentStatMode,
+  "Former Mets"
+);
+
+}
+
+async function loadStats() {
+
+const container =
+document.getElementById(
+“stats-table-container”
+);
+
+if (!container) {
+return;
+}
+
+container.innerHTML =
+<div class="loading"> Loading Mets statistics... </div>;
+
+try {
+
+const data =
+  await api(
+    `/api/mets/stats?season=${CURRENT_SEASON}`
+  );
+const splits =
+  extractStatArray(data);
+allStats =
+  splits
+    .map(prepareStatRecord)
+    .filter(
+      record =>
+        record.name !==
+        "Unknown Player"
+    );
+if (!allStats.length) {
+  container.innerHTML =
+    `<div class="loading">
+      No Mets player statistics found.
+    </div>`;
+  return;
+}
+currentSort = {
+  key: null,
+  direction: "desc"
+};
+renderStats();
+createStatOfDayFromStats();
+
+} catch (error) {
+
+console.error(
+  "Stats:",
+  error
+);
+container.innerHTML =
+  `<div class="error-box">
+    Unable to load Mets statistics.
+  </div>`;
+
+}
+
+}
+
+// ============================================================
+// STAT MODE / SORTING
+// ============================================================
+
+document.addEventListener(
+“click”,
+event => {
+
+const modeButton =
+  event.target.closest(
+    "[data-stat-mode]"
+  );
+if (modeButton) {
+  currentStatMode =
+    modeButton.dataset.statMode;
+  document
+    .querySelectorAll(
+      ".stats-mode-button"
+    )
+    .forEach(
+      button =>
+        button.classList.remove(
+          "active"
+        )
+    );
+  modeButton.classList.add(
+    "active"
+  );
+  /*
+    Reload because the backend may provide
+    separate hitting/pitching datasets.
+  */
+  loadStats();
+  return;
+}
+const header =
+  event.target.closest(
+    "[data-sort-key]"
+  );
+if (header) {
+  const key =
+    header.dataset.sortKey;
+  if (
+    currentSort.key ===
+    key
+  ) {
+    currentSort.direction =
+      currentSort.direction ===
+      "desc"
+        ? "asc"
+        : "desc";
+  } else {
+    currentSort.key =
+      key;
+    currentSort.direction =
+      "desc";
+  }
+  renderStats();
+  return;
+}
+const playerButton =
+  event.target.closest(
+    ".player-link"
+  );
+if (playerButton) {
+  const id =
+    playerButton.dataset.playerId;
+  if (id) {
+    openPlayer(id);
+  }
+}
+
+}
+);
+
+document.addEventListener(
+“input”,
+event => {
+
+if (
+  event.target.id ===
+  "stats-search"
+) {
+  renderStats();
+}
+
+}
+);
 
 // ============================================================
 // PLAYER MODAL
 // ============================================================
 
-async function openPlayer(playerId) {
+async function openPlayer(
+playerId
+) {
 
-  const modal =
-    document.getElementById(
-      "player-modal"
-    );
+const modal =
+document.getElementById(
+“player-modal”
+);
 
-  const details =
-    document.getElementById(
-      "player-details"
-    );
+const details =
+document.getElementById(
+“player-details”
+);
 
-  if (!modal || !details) {
-    return;
-  }
+if (!modal || !details) {
+return;
+}
 
-  modal.classList.remove(
-    "hidden"
+modal.classList.remove(
+“hidden”
+);
+
+details.innerHTML =
+<div class="loading"> Loading player... </div>;
+
+try {
+
+const playerData =
+  await api(
+    `/api/player/${encodeURIComponent(playerId)}`
   );
-
-  details.innerHTML =
-    `<div class="loading">
-      Loading player...
-    </div>`;
-
-  try {
-
-    const playerData =
-      await api(
-        `/api/player/${playerId}`
-      );
-
-    const statsData =
-      await api(
-        `/api/player/${playerId}/stats?season=${CURRENT_SEASON}&group=hitting`
-      );
-
-    const player =
-      playerData.player;
-
-    const split =
-      statsData.stats?.[0]?.splits?.[0];
-
-    const stat =
-      split?.stat || {};
-
-    details.innerHTML = `
-
-      <div class="player-modal-name">
-        ${escapeHTML(
-          player?.fullName ||
-          "Unknown Player"
-        )}
+let statsData;
+try {
+  statsData =
+    await api(
+      `/api/player/${encodeURIComponent(playerId)}/stats?season=${CURRENT_SEASON}&group=hitting`
+    );
+} catch {
+  statsData = {
+    stats: []
+  };
+}
+const player =
+  playerData?.player ||
+  playerData;
+const split =
+  statsData?.stats?.[0]?.splits?.[0] ||
+  statsData?.splits?.[0] ||
+  {};
+const stat =
+  split?.stat ||
+  {};
+details.innerHTML = `
+  <div class="player-modal-name">
+    ${escapeHTML(
+      player?.fullName ||
+      player?.name ||
+      "Unknown Player"
+    )}
+  </div>
+  <div class="player-modal-info">
+    ${escapeHTML(
+      player?.primaryPosition?.name ||
+      player?.position?.name ||
+      "—"
+    )}
+    ${
+      player?.primaryNumber
+        ? ` · #${escapeHTML(
+            player.primaryNumber
+          )}`
+        : ""
+    }
+  </div>
+  <div class="player-stat-grid">
+    <div class="player-stat">
+      <div class="player-stat-label">
+        AVG
       </div>
-
-      <div class="player-modal-info">
-
+      <div class="player-stat-value">
         ${escapeHTML(
-          player?.primaryPosition?.name ||
+          stat.avg ||
           "—"
         )}
-
-        ${
-          player?.primaryNumber
-            ? ` · #${escapeHTML(
-                player.primaryNumber
-              )}`
-            : ""
-        }
-
       </div>
-
-      <div class="player-stat-grid">
-
-        <div class="player-stat">
-          <div class="player-stat-label">
-            AVG
-          </div>
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.avg || "—"
-            )}
-          </div>
-        </div>
-
-        <div class="player-stat">
-          <div class="player-stat-label">
-            HR
-          </div>
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.homeRuns ?? "—"
-            )}
-          </div>
-        </div>
-
-        <div class="player-stat">
-          <div class="player-stat-label">
-            RBI
-          </div>
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.rbi ?? "—"
-            )}
-          </div>
-        </div>
-
-        <div class="player-stat">
-          <div class="player-stat-label">
-            OPS
-          </div>
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.ops || "—"
-            )}
-          </div>
-        </div>
-
-        <div class="player-stat">
-          <div class="player-stat-label">
-            OBP
-          </div>
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.obp || "—"
-            )}
-          </div>
-        </div>
-
-        <div class="player-stat">
-          <div class="player-stat-label">
-            SLG
-          </div>
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.slg || "—"
-            )}
-          </div>
-        </div>
-
-      </div>
-
-    `;
-
-  } catch (error) {
-
-    console.error(
-      "Player:",
-      error
-    );
-
-    details.innerHTML =
-      `<div class="loading">
-        Unable to load player information.
-      </div>`;
-
-  }
-
-}
-
-
-// ============================================================
-// STATS STATE
-// ============================================================
-
-let currentStatsType =
-  "hitting";
-
-let currentStatsRows =
-  [];
-
-let currentStatsSort =
-  null;
-
-let currentStatsSortDirection =
-  "desc";
-
-let activeMetsIds =
-  new Set();
-
-
-// ============================================================
-// DETERMINE WHETHER PLAYER IS ACTIVE
-// ============================================================
-
-async function loadActiveMetsIds() {
-
-  try {
-
-    const data =
-      await api(
-        `/api/mets/roster?season=${CURRENT_SEASON}`
-      );
-
-    activeMetsIds =
-      new Set(
-        (data.roster || [])
-          .map(
-            player =>
-              Number(
-                player.person?.id
-              )
-          )
-          .filter(
-            id =>
-              Number.isFinite(id)
-          )
-      );
-
-  } catch (error) {
-
-    console.error(
-      "Active roster for stats:",
-      error
-    );
-
-    activeMetsIds =
-      new Set();
-
-  }
-
-}
-
-
-// ============================================================
-// STATS LABELS
-// ============================================================
-
-const hittingColumns = [
-
-  {
-    key: "gamesPlayed",
-    label: "G",
-    value: stat =>
-      stat.gamesPlayed ??
-      stat.games
-  },
-
-  {
-    key: "atBats",
-    label: "AB",
-    value: stat =>
-      stat.atBats
-  },
-
-  {
-    key: "hits",
-    label: "H",
-    value: stat =>
-      stat.hits
-  },
-
-  {
-    key: "homeRuns",
-    label: "HR",
-    value: stat =>
-      stat.homeRuns
-  },
-
-  {
-    key: "rbi",
-    label: "RBI",
-    value: stat =>
-      stat.rbi
-  },
-
-  {
-    key: "avg",
-    label: "AVG",
-    value: stat =>
-      stat.avg
-  },
-
-  {
-    key: "obp",
-    label: "OBP",
-    value: stat =>
-      stat.obp
-  },
-
-  {
-    key: "slg",
-    label: "SLG",
-    value: stat =>
-      stat.slg
-  },
-
-  {
-    key: "ops",
-    label: "OPS",
-    value: stat =>
-      stat.ops
-  }
-
-];
-
-
-const pitchingColumns = [
-
-  {
-    key: "gamesPlayed",
-    label: "G",
-    value: stat =>
-      stat.gamesPlayed ??
-      stat.games
-  },
-
-  {
-    key: "gamesStarted",
-    label: "GS",
-    value: stat =>
-      stat.gamesStarted
-  },
-
-  {
-    key: "wins",
-    label: "W",
-    value: stat =>
-      stat.wins
-  },
-
-  {
-    key: "losses",
-    label: "L",
-    value: stat =>
-      stat.losses
-  },
-
-  {
-    key: "saves",
-    label: "SV",
-    value: stat =>
-      stat.saves
-  },
-
-  {
-    key: "inningsPitched",
-    label: "IP",
-    value: stat =>
-      stat.inningsPitched
-  },
-
-  {
-    key: "era",
-    label: "ERA",
-    value: stat =>
-      stat.era
-  },
-
-  {
-    key: "whip",
-    label: "WHIP",
-    value: stat =>
-      stat.whip
-  },
-
-  {
-    key: "strikeOuts",
-    label: "SO",
-    value: stat =>
-      stat.strikeOuts
-  },
-
-  {
-    key: "baseOnBalls",
-    label: "BB",
-    value: stat =>
-      stat.baseOnBalls
-  }
-
-];
-
-
-// ============================================================
-// NUMBER CONVERSION
-// ============================================================
-
-function numericValue(value) {
-
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
-
-    return null;
-
-  }
-
-  const number =
-    Number(value);
-
-  if (
-    Number.isFinite(number)
-  ) {
-
-    return number;
-
-  }
-
-  return null;
-
-}
-
-
-// ============================================================
-// CREATE STATS CONTROLS
-// ============================================================
-
-function renderStatsControls() {
-
-  const container =
-    document.getElementById(
-      "stats-table-container"
-    );
-
-  if (!container) {
-    return;
-  }
-
-  container.innerHTML = `
-
-    <div class="stats-controls">
-
-      <div class="stats-type-toggle">
-
-        <button
-          id="stats-hitting-button"
-          class="stats-type-button active"
-          type="button"
-        >
-          Hitting
-        </button>
-
-        <button
-          id="stats-pitching-button"
-          class="stats-type-button"
-          type="button"
-        >
-          Pitching
-        </button>
-
-      </div>
-
-      <div
-        id="stats-current-container"
-      ></div>
-
-      <div
-        id="stats-former-container"
-      ></div>
-
     </div>
-
-  `;
-
-  document
-    .getElementById(
-      "stats-hitting-button"
-    )
-    .addEventListener(
-      "click",
-      () => {
-
-        if (
-          currentStatsType ===
-          "hitting"
-        ) {
-          return;
-        }
-
-        currentStatsType =
-          "hitting";
-
-        currentStatsSort =
-          null;
-
-        currentStatsSortDirection =
-          "desc";
-
-        loadStats();
-
-      }
-    );
-
-  document
-    .getElementById(
-      "stats-pitching-button"
-    )
-    .addEventListener(
-      "click",
-      () => {
-
-        if (
-          currentStatsType ===
-          "pitching"
-        ) {
-          return;
-        }
-
-        currentStatsType =
-          "pitching";
-
-        currentStatsSort =
-          null;
-
-        currentStatsSortDirection =
-          "desc";
-
-        loadStats();
-
-      }
-    );
-
-}
-
-
-// ============================================================
-// STAT DISPLAY
-// ============================================================
-
-function displayStat(
-  stat,
-  column
-) {
-
-  const value =
-    column.value(stat);
-
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
-
-    return "—";
-
-  }
-
-  return escapeHTML(
-    value
-  );
-
-}
-
-
-// ============================================================
-// SORT ROWS
-// ============================================================
-
-function sortStatsRows(
-  rows,
-  columns
-) {
-
-  if (!currentStatsSort) {
-
-    return [...rows];
-
-  }
-
-  const column =
-    columns.find(
-      c =>
-        c.key ===
-        currentStatsSort
-    );
-
-  if (!column) {
-
-    return [...rows];
-
-  }
-
-  return [...rows].sort(
-    (a, b) => {
-
-      const aValue =
-        numericValue(
-          column.value(
-            a.stat
-          )
-        );
-
-      const bValue =
-        numericValue(
-          column.value(
-            b.stat
-          )
-        );
-
-      // Put missing values at bottom.
-      if (
-        aValue === null &&
-        bValue === null
-      ) {
-        return 0;
-      }
-
-      if (
-        aValue === null
-      ) {
-        return 1;
-      }
-
-      if (
-        bValue === null
-      ) {
-        return -1;
-      }
-
-      const difference =
-        aValue - bValue;
-
-      return (
-        currentStatsSortDirection ===
-        "asc"
-          ? difference
-          : -difference
-      );
-
-    }
-  );
-
-}
-
-
-// ============================================================
-// RENDER ONE STATS TABLE
-// ============================================================
-
-function renderStatsTable(
-  rows,
-  title
-) {
-
-  const columns =
-    currentStatsType ===
-    "hitting"
-      ? hittingColumns
-      : pitchingColumns;
-
-  const sortedRows =
-    sortStatsRows(
-      rows,
-      columns
-    );
-
-  return `
-
-    <div class="stats-category">
-
-      <h2 class="stats-category-title">
-        ${escapeHTML(title)}
-      </h2>
-
-      <div class="stats-table-wrapper">
-
-        <table class="stats-table">
-
-          <thead>
-
-            <tr>
-
-              <th class="stats-player-heading">
-                PLAYER
-              </th>
-
-              ${columns
-                .map(column => {
-
-                  const active =
-                    currentStatsSort ===
-                    column.key;
-
-                  const arrow =
-                    active
-                      ? (
-                          currentStatsSortDirection ===
-                          "desc"
-                            ? " ↓"
-                            : " ↑"
-                        )
-                      : "";
-
-                  return `
-
-                    <th
-                      class="sortable-stat ${
-                        active
-                          ? "sorted-stat"
-                          : ""
-                      }"
-                      data-sort-key="${escapeHTML(
-                        column.key
-                      )}"
-                    >
-
-                      ${escapeHTML(
-                        column.label
-                      )}
-
-                      <span class="sort-arrow">
-                        ${arrow}
-                      </span>
-
-                    </th>
-
-                  `;
-
-                })
-                .join("")}
-
-            </tr>
-
-          </thead>
-
-          <tbody>
-
-            ${
-              sortedRows.length
-                ? sortedRows
-                    .map(row => {
-
-                      const player =
-                        row.player ||
-                        {};
-
-                      const playerId =
-                        player.id;
-
-                      return `
-
-                        <tr>
-
-                          <td>
-
-                            ${
-                              playerId
-                                ? `
-                                  <button
-                                    class="player-link"
-                                    data-player-id="${escapeHTML(
-                                      playerId
-                                    )}"
-                                  >
-                                    ${escapeHTML(
-                                      player.fullName ||
-                                      "Unknown Player"
-                                    )}
-                                  </button>
-                                `
-                                : escapeHTML(
-                                    player.fullName ||
-                                    "Unknown Player"
-                                  )
-                            }
-
-                          </td>
-
-                          ${columns
-                            .map(
-                              column => `
-
-                                <td>
-                                  ${displayStat(
-                                    row.stat,
-                                    column
-                                  )}
-                                </td>
-
-                              `
-                            )
-                            .join("")}
-
-                        </tr>
-
-                      `;
-
-                    })
-                    .join("")
-                : `
-                  <tr>
-
-                    <td
-                      colspan="${
-                        columns.length + 1
-                      }"
-                    >
-
-                      No players found.
-
-                    </td>
-
-                  </tr>
-                `
-            }
-
-          </tbody>
-
-        </table>
-
+    <div class="player-stat">
+      <div class="player-stat-label">
+        HR
       </div>
-
+      <div class="player-stat-value">
+        ${escapeHTML(
+          stat.homeRuns ??
+          "—"
+        )}
+      </div>
     </div>
+    <div class="player-stat">
+      <div class="player-stat-label">
+        RBI
+      </div>
+      <div class="player-stat-value">
+        ${escapeHTML(
+          stat.rbi ??
+          "—"
+        )}
+      </div>
+    </div>
+    <div class="player-stat">
+      <div class="player-stat-label">
+        OPS
+      </div>
+      <div class="player-stat-value">
+        ${escapeHTML(
+          stat.ops ||
+          "—"
+        )}
+      </div>
+    </div>
+    <div class="player-stat">
+      <div class="player-stat-label">
+        OBP
+      </div>
+      <div class="player-stat-value">
+        ${escapeHTML(
+          stat.obp ||
+          "—"
+        )}
+      </div>
+    </div>
+    <div class="player-stat">
+      <div class="player-stat-label">
+        SLG
+      </div>
+      <div class="player-stat-value">
+        ${escapeHTML(
+          stat.slg ||
+          "—"
+        )}
+      </div>
+    </div>
+  </div>
+`;
 
-  `;
+} catch (error) {
 
-}
-
-
-// ============================================================
-// RENDER STATS
-// ============================================================
-
-function renderStats() {
-
-  const container =
-    document.getElementById(
-      "stats-table-container"
-    );
-
-  if (!container) {
-    return;
-  }
-
-  const current =
-    [];
-
-  const former =
-    [];
-
-  for (
-    const row of currentStatsRows
-  ) {
-
-    const playerId =
-      Number(
-        row.player?.id
-      );
-
-    if (
-      activeMetsIds.has(
-        playerId
-      )
-    ) {
-
-      current.push(row);
-
-    } else {
-
-      former.push(row);
-
-    }
-
-  }
-
-  // Make the controls.
-  renderStatsControls();
-
-  const currentContainer =
-    document.getElementById(
-      "stats-current-container"
-    );
-
-  const formerContainer =
-    document.getElementById(
-      "stats-former-container"
-    );
-
-  if (!currentContainer ||
-      !formerContainer) {
-
-    return;
-
-  }
-
-  currentContainer.innerHTML =
-    renderStatsTable(
-      current,
-      "Current Active Mets"
-    );
-
-  formerContainer.innerHTML =
-    renderStatsTable(
-      former,
-      "Former Mets / No Longer on Team"
-    );
-
-  // ----------------------------------------------------------
-  // Sorting buttons
-  // ----------------------------------------------------------
-
-  document
-    .querySelectorAll(
-      ".sortable-stat"
-    )
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          const key =
-            button.dataset.sortKey;
-
-          if (
-            currentStatsSort ===
-            key
-          ) {
-
-            currentStatsSortDirection =
-              currentStatsSortDirection ===
-              "desc"
-                ? "asc"
-                : "desc";
-
-          } else {
-
-            currentStatsSort =
-              key;
-
-            currentStatsSortDirection =
-              "desc";
-
-          }
-
-          renderStats();
-
-        }
-      );
-
-    });
-
-  // ----------------------------------------------------------
-  // Player buttons
-  // ----------------------------------------------------------
-
-  document
-    .querySelectorAll(
-      ".player-link"
-    )
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          openPlayer(
-            button.dataset.playerId
-          );
-
-        }
-      );
-
-    });
+console.error(
+  "Player:",
+  error
+);
+details.innerHTML =
+  `<div class="error-box">
+    Unable to load player information.
+  </div>`;
 
 }
 
+}
 
-// ============================================================
-// LOAD STATS
-// ============================================================
+function closePlayerModal() {
 
-async function loadStats() {
-
-  const container =
-    document.getElementById(
-      "stats-table-container"
-    );
-
-  if (!container) {
-    return;
-  }
-
-  container.innerHTML =
-    `<div class="loading">
-      Loading ${
-        currentStatsType ===
-        "hitting"
-          ? "hitting"
-          : "pitching"
-      } statistics...
-    </div>`;
-
-  try {
-
-    // Make sure we know exactly who is
-    // currently active before classifying
-    // players.
-    await loadActiveMetsIds();
-
-    const data =
-      await api(
-        `/api/mets/stats?season=${CURRENT_SEASON}&group=${currentStatsType}`
-      );
-
-    currentStatsRows =
-      data.stats || [];
-
-    renderStats();
-
-  } catch (error) {
-
-    console.error(
-      "Stats:",
-      error
-    );
-
-    container.innerHTML =
-      `<div class="loading">
-        Unable to load Mets statistics.
-      </div>`;
-
-  }
+document
+.getElementById(
+“player-modal”
+)
+?.classList.add(
+“hidden”
+);
 
 }
 
+document
+.getElementById(
+“close-modal”
+)
+?.addEventListener(
+“click”,
+closePlayerModal
+);
+
+document
+.querySelector(
+“.modal-backdrop”
+)
+?.addEventListener(
+“click”,
+closePlayerModal
+);
+
+document.addEventListener(
+“keydown”,
+event => {
+
+if (
+  event.key ===
+  "Escape"
+) {
+  closePlayerModal();
+}
+
+}
+);
 
 // ============================================================
 // TRANSACTIONS
@@ -2001,267 +2304,579 @@ async function loadStats() {
 
 async function loadTransactions() {
 
-  const container =
-    document.getElementById(
-      "transactions-list"
-    );
+const container =
+document.getElementById(
+“transactions-list”
+);
 
-  if (!container) {
-    return;
-  }
+if (!container) {
+return;
+}
 
+container.innerHTML =
+<div class="loading"> Loading recent Mets transactions... </div>;
+
+try {
+
+const data =
+  await api(
+    "/api/mets/transactions"
+  );
+const transactions =
+  Array.isArray(
+    data?.transactions
+  )
+    ? data.transactions
+    : [];
+if (!transactions.length) {
   container.innerHTML =
     `<div class="loading">
-      Loading recent Mets transactions...
+      No recent transactions found.
     </div>`;
+  return;
+}
+container.innerHTML =
+  transactions
+    .map(transaction => {
+      const playerName =
+        getPlayerName(
+          transaction
+        );
+      const finalName =
+        playerName ===
+        "Unknown Player"
+          ? "Team transaction"
+          : playerName;
+      return `
+        <div class="transaction">
+          <div class="transaction-date">
+            ${escapeHTML(
+              formatDate(
+                transaction.date
+              )
+            )}
+          </div>
+          <div class="transaction-player">
+            ${escapeHTML(
+              finalName
+            )}
+          </div>
+          <div class="transaction-type">
+            ${escapeHTML(
+              transaction.description ||
+              transaction.typeDesc ||
+              transaction.type ||
+              "Transaction"
+            )}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
 
-  try {
+} catch (error) {
 
-    const data =
-      await api(
-        "/api/mets/transactions"
-      );
+console.error(
+  "Transactions:",
+  error
+);
+container.innerHTML =
+  `<div class="error-box">
+    Unable to load Mets transactions.
+  </div>`;
 
-    const transactions =
-      data.transactions || [];
+}
 
-    if (!transactions.length) {
+}
 
-      container.innerHTML =
-        `<div class="loading">
-          No recent transactions found.
-        </div>`;
+// ============================================================
+// STAT OF THE DAY
+// ============================================================
 
-      return;
+function createStatOfDayFromStats() {
 
-    }
+const element =
+document.getElementById(
+“stat-of-day”
+);
 
-    container.innerHTML =
-      transactions
-        .map(
-          transaction => {
+if (!element) {
+return;
+}
 
-            let playerName =
-              transaction.player?.fullName;
+if (!allStats.length) {
+return;
+}
 
-            if (!playerName) {
+const hitters =
+allStats.filter(
+p =>
+p.HR !== null
+);
 
-              const first =
-                transaction.player?.firstName ||
-                "";
+if (!hitters.length) {
+return;
+}
 
-              const last =
-                transaction.player?.lastName ||
-                "";
+const leader =
+[…hitters]
+.sort(
+(a,b) =>
+(b.HR || 0) -
+(a.HR || 0)
+)[0];
 
-              playerName =
-                `${first} ${last}`.trim();
+element.innerHTML = `
 
-            }
+<div class="stat-big">
+  🏆
+</div>
+<h3>
+  ${escapeHTML(
+    leader.name
+  )}
+</h3>
+<p>
+  Leads the available Mets hitting data
+  with ${escapeHTML(
+    leader.HR
+  )} home runs.
+</p>
 
-            if (!playerName) {
+`;
+}
 
-              playerName =
-                "Team transaction";
+function createStatOfDay(games) {
 
-            }
+if (!games?.length) {
+return;
+}
 
-            return `
+const element =
+document.getElementById(
+“stat-of-day”
+);
 
-              <div class="transaction">
+if (!element) {
+return;
+}
 
-                <div class="transaction-date">
-                  ${formatDate(
-                    transaction.date
-                  )}
-                </div>
+/*
+Keep the actual player-based stat
+if stats are already available.
+*/
 
-                <div class="transaction-player">
-                  ${escapeHTML(
-                    playerName
-                  )}
-                </div>
+if (allStats.length) {
+createStatOfDayFromStats();
+}
 
-                <div class="transaction-type">
-                  ${escapeHTML(
-                    transaction.description ||
-                    transaction.typeDesc ||
-                    "Transaction"
-                  )}
-                </div>
+}
 
-              </div>
+// ============================================================
+// RESEARCH LAB
+// ============================================================
 
-            `;
+async function runResearch(
+query
+) {
 
-          }
-        )
-        .join("");
+const input =
+document.getElementById(
+“research-input”
+);
 
-  } catch (error) {
+const results =
+document.getElementById(
+“research-results”
+);
 
-    console.error(
-      "Transactions:",
-      error
+if (!results) {
+return;
+}
+
+query =
+String(query || “”).trim();
+
+if (!query) {
+
+results.innerHTML = `
+  <div class="research-empty">
+    <div>🔎</div>
+    <h3>Enter a search</h3>
+    <p>
+      Search for a player or baseball statistic.
+    </p>
+  </div>
+`;
+return;
+
+}
+
+if (input) {
+input.value = query;
+}
+
+results.innerHTML = `
+
+<div class="loading">
+  Searching Mets data for
+  <strong>${escapeHTML(query)}</strong>...
+</div>
+
+`;
+
+/*
+First try the existing MLB research endpoint
+if the server exposes one.
+*/
+
+try {
+
+const encoded =
+  encodeURIComponent(
+    query
+  );
+const data =
+  await api(
+    `/api/mlb/query?question=${encoded}`
+  );
+renderResearchResult(
+  query,
+  data
+);
+return;
+
+} catch (error) {
+
+console.info(
+  "Research endpoint unavailable:",
+  error
+);
+
+}
+
+/*
+Front-end fallback.
+
+This lets Research Lab search the stats already
+loaded into the page without needing another backend.
+
+*/
+
+const lower =
+query.toLowerCase();
+
+const matches =
+allStats.filter(
+record =>
+record.name
+.toLowerCase()
+.includes(lower)
+);
+
+if (matches.length) {
+
+results.innerHTML = `
+  <div class="stats-block">
+    <div class="stats-block-title">
+      Search Results
+    </div>
+    <table class="stats-table">
+      <thead>
+        <tr>
+          <th>PLAYER</th>
+          <th>G</th>
+          <th>HR</th>
+          <th>RBI</th>
+          <th>AVG</th>
+          <th>OBP</th>
+          <th>SLG</th>
+          <th>OPS</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${matches
+          .map(record => `
+            <tr>
+              <td>
+                ${
+                  record.id
+                    ? `
+                      <button
+                        class="player-link"
+                        data-player-id="${escapeHTML(record.id)}"
+                      >
+                        ${escapeHTML(record.name)}
+                      </button>
+                    `
+                    : escapeHTML(
+                        record.name
+                      )
+                }
+              </td>
+              <td>
+                ${escapeHTML(
+                  formatStat(record.G)
+                )}
+              </td>
+              <td>
+                ${escapeHTML(
+                  formatStat(record.HR)
+                )}
+              </td>
+              <td>
+                ${escapeHTML(
+                  formatStat(record.RBI)
+                )}
+              </td>
+              <td>
+                ${escapeHTML(
+                  formatStat(
+                    record.AVG,
+                    3
+                  )
+                )}
+              </td>
+              <td>
+                ${escapeHTML(
+                  formatStat(
+                    record.OBP,
+                    3
+                  )
+                )}
+              </td>
+              <td>
+                ${escapeHTML(
+                  formatStat(
+                    record.SLG,
+                    3
+                  )
+                )}
+              </td>
+              <td>
+                ${escapeHTML(
+                  formatStat(
+                    record.OPS,
+                    3
+                  )
+                )}
+              </td>
+            </tr>
+          `)
+          .join("")}
+      </tbody>
+    </table>
+  </div>
+`;
+return;
+
+}
+
+results.innerHTML = `
+
+<div class="research-empty">
+  <div>🧠</div>
+  <h3>
+    Research Engine Ready
+  </h3>
+  <p>
+    No matching loaded player data was found.
+    The Research Lab is ready to connect to
+    the full MLB Research Engine.
+  </p>
+</div>
+
+`;
+
+}
+
+function renderResearchResult(
+query,
+data
+) {
+
+const results =
+document.getElementById(
+“research-results”
+);
+
+if (!results) {
+return;
+}
+
+const player =
+data?.player ||
+data?.playerName;
+
+const stats =
+data?.stats ||
+data;
+
+results.innerHTML = `
+
+<div class="stats-block">
+  <div class="stats-block-title">
+    Research Result
+  </div>
+  <div style="
+    padding: 10px 0;
+    line-height: 1.7;
+  ">
+    <strong>
+      ${escapeHTML(query)}
+    </strong>
+    <pre style="
+      white-space: pre-wrap;
+      margin-top: 12px;
+      color: #667085;
+      font-family: inherit;
+      font-size: 13px;
+    ">${escapeHTML(
+      JSON.stringify(
+        stats,
+        null,
+        2
+      )
+    )}</pre>
+  </div>
+</div>
+
+`;
+
+}
+
+document.addEventListener(
+“click”,
+event => {
+
+const suggestion =
+  event.target.closest(
+    "[data-research]"
+  );
+if (suggestion) {
+  runResearch(
+    suggestion.dataset.research
+  );
+  return;
+}
+if (
+  event.target.id ===
+  "research-button"
+) {
+  runResearch(
+    document.getElementById(
+      "research-input"
+    )?.value
+  );
+}
+
+}
+);
+
+document
+.getElementById(
+“research-input”
+)
+?.addEventListener(
+“keydown”,
+event => {
+
+  if (
+    event.key ===
+    "Enter"
+  ) {
+    runResearch(
+      event.target.value
     );
-
-    container.innerHTML =
-      `<div class="loading">
-        Unable to load Mets transactions.
-      </div>`;
-
   }
-
 }
 
-
-// ============================================================
-// MODAL
-// ============================================================
-
-const closeModal =
-  document.getElementById(
-    "close-modal"
-  );
-
-if (closeModal) {
-
-  closeModal.addEventListener(
-    "click",
-    () => {
-
-      const modal =
-        document.getElementById(
-          "player-modal"
-        );
-
-      if (modal) {
-
-        modal.classList.add(
-          "hidden"
-        );
-
-      }
-
-    }
-  );
-
-}
-
-
-const modalBackdrop =
-  document.querySelector(
-    ".modal-backdrop"
-  );
-
-if (modalBackdrop) {
-
-  modalBackdrop.addEventListener(
-    "click",
-    () => {
-
-      const modal =
-        document.getElementById(
-          "player-modal"
-        );
-
-      if (modal) {
-
-        modal.classList.add(
-          "hidden"
-        );
-
-      }
-
-    }
-  );
-
-}
-
+);
 
 // ============================================================
 // REFRESH BUTTONS
 // ============================================================
 
-const refreshHome =
-  document.getElementById(
-    "refresh-home"
-  );
+document
+.getElementById(
+“refresh-home”
+)
+?.addEventListener(
+“click”,
+async () => {
 
-if (refreshHome) {
-
-  refreshHome.addEventListener(
-    "click",
-    async () => {
-
-      await loadStandings();
-      await loadGames();
-
-    }
-  );
-
+  await loadStandings();
+  await loadGames();
 }
 
+);
 
-const refreshGames =
-  document.getElementById(
-    "refresh-games"
-  );
+document
+.getElementById(
+“refresh-games”
+)
+?.addEventListener(
+“click”,
+loadGames
+);
 
-if (refreshGames) {
+document
+.getElementById(
+“refresh-roster”
+)
+?.addEventListener(
+“click”,
+loadRoster
+);
 
-  refreshGames.addEventListener(
-    "click",
-    loadGames
-  );
+document
+.getElementById(
+“refresh-stats”
+)
+?.addEventListener(
+“click”,
+loadStats
+);
 
+document
+.getElementById(
+“refresh-transactions”
+)
+?.addEventListener(
+“click”,
+loadTransactions
+);
+
+// ============================================================
+// AUTOMATIC EASTERN-TIME DAILY REFRESH
+// ============================================================
+
+let lastEasternDate =
+getEasternDate();
+
+setInterval(
+() => {
+
+const currentEasternDate =
+  getEasternDate();
+if (
+  currentEasternDate !==
+  lastEasternDate
+) {
+  lastEasternDate =
+    currentEasternDate;
+  /*
+    The date has changed in New York.
+    Refresh the schedule and standings so
+    tomorrow's games automatically appear.
+  */
+  loadStandings();
+  loadGames();
 }
 
-
-const refreshRoster =
-  document.getElementById(
-    "refresh-roster"
-  );
-
-if (refreshRoster) {
-
-  refreshRoster.addEventListener(
-    "click",
-    loadRoster
-  );
-
-}
-
-
-const refreshStats =
-  document.getElementById(
-    "refresh-stats"
-  );
-
-if (refreshStats) {
-
-  refreshStats.addEventListener(
-    "click",
-    loadStats
-  );
-
-}
-
-
-const refreshTransactions =
-  document.getElementById(
-    "refresh-transactions"
-  );
-
-if (refreshTransactions) {
-
-  refreshTransactions.addEventListener(
-    "click",
-    loadTransactions
-  );
-
-}
-
+},
+60 * 1000
+);
 
 // ============================================================
 // INITIALIZE
@@ -2269,20 +2884,30 @@ if (refreshTransactions) {
 
 async function initialize() {
 
-  console.log(
-    "Starting Mets HQ..."
-  );
+console.log(
+“Starting Mets HQ…”
+);
 
-  await Promise.all([
-    loadStandings(),
-    loadGames()
-  ]);
+/*
+Load the most important dashboard data first.
+*/
 
-  console.log(
-    "Mets HQ ready."
-  );
+await Promise.allSettled([
+loadStandings(),
+loadGames()
+]);
+
+/*
+Stats aren’t necessary for the first paint,
+but load them after the dashboard.
+*/
+
+loadStats();
+
+console.log(
+“Mets HQ ready.”
+);
 
 }
-
 
 initialize();
