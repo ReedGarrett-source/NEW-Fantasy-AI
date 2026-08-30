@@ -1,3 +1,7 @@
+/* =========================================
+   RESET
+   ========================================= */
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -5,854 +9,1005 @@
 }
 
 :root {
-  --background: #ffffff;
-  --sidebar: #f7f7f8;
-  --sidebar-hover: #ececec;
-  --border: #e5e5e5;
-  --text: #171717;
-  --muted: #6b6b6b;
-  --input: #ffffff;
-  --black: #111111;
-  --dark-gray: #2d2d2d;
+  --blue: #002d72;
+  --blue-dark: #001b45;
+  --orange: #ff5910;
+  --orange-light: #ff6b2c;
+
+  --background: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f6;
+
+  --text: #111827;
+  --muted: #667085;
+  --border: #e2e6ed;
+
+  --radius: 16px;
 }
 
-html,
 body {
-  width: 100%;
-  height: 100%;
   font-family:
+    Inter,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
-    Roboto,
-    Helvetica,
-    Arial,
     sans-serif;
 
   background: var(--background);
   color: var(--text);
+
+  min-height: 100vh;
 }
 
-body {
-  overflow: hidden;
-}
 
-button,
-textarea {
-  font-family: inherit;
-}
+/* =========================================
+   TOP BAR
+   ========================================= */
 
-button {
-  cursor: pointer;
-}
+.topbar {
+  background: var(--blue);
+  color: white;
 
-/* ========================================
-   APP
-======================================== */
+  min-height: 76px;
 
-.app {
-  display: flex;
-  width: 100%;
-  height: 100vh;
-}
-
-/* ========================================
-   SIDEBAR
-======================================== */
-
-.sidebar {
-  width: 260px;
-  height: 100vh;
-
-  flex-shrink: 0;
+  padding: 0 5%;
 
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-
-  background: var(--sidebar);
-  border-right: 1px solid var(--border);
-}
-
-.sidebar-top {
-  padding: 14px;
-}
-
-/* New Chat */
-
-.new-chat-btn {
-  width: 100%;
-  height: 44px;
-
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  padding: 0 13px;
-
-  border: 1px solid #d9d9d9;
-  border-radius: 10px;
-
-  background: #ffffff;
-  color: var(--text);
-
-  font-size: 14px;
-  font-weight: 500;
-
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.new-chat-btn:hover {
-  background: var(--sidebar-hover);
-  border-color: #cccccc;
-}
-
-.new-chat-icon {
-  font-size: 21px;
-  font-weight: 400;
-  line-height: 1;
-}
-
-/* Sidebar Section */
-
-.sidebar-section-title {
-  margin: 25px 8px 10px;
-
-  color: #777777;
-
-  font-size: 12px;
-  font-weight: 600;
-
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-/* Chat History */
-
-.chat-history {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.history-item {
-  width: 100%;
-
-  padding: 9px 10px;
-
-  border: none;
-  border-radius: 8px;
-
-  background: transparent;
-  color: #333333;
-
-  text-align: left;
-
-  font-size: 13px;
-
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  transition: background 0.15s ease;
-}
-
-.history-item:hover {
-  background: var(--sidebar-hover);
-}
-
-/* Sidebar Bottom */
-
-.sidebar-bottom {
-  padding: 14px;
-
-  border-top: 1px solid var(--border);
-}
-
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  padding: 7px;
-}
-
-/* FantasyIQ Logo */
-
-.brand-icon,
-.welcome-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  background: var(--black);
-  color: #ffffff;
-
-  font-weight: 700;
-  letter-spacing: -0.05em;
-}
-
-.brand-icon {
-  width: 36px;
-  height: 36px;
-
-  border-radius: 10px;
-
-  font-size: 12px;
-}
-
-.brand-name {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.brand-subtitle {
-  margin-top: 2px;
-
-  color: var(--muted);
-
-  font-size: 11px;
-}
-
-/* ========================================
-   MAIN
-======================================== */
-
-.main {
-  position: relative;
-
-  flex: 1;
-  min-width: 0;
-  height: 100vh;
-
-  display: flex;
-  flex-direction: column;
-
-  background: var(--background);
-}
-
-/* ========================================
-   MOBILE HEADER
-======================================== */
-
-.mobile-header {
-  display: none;
-
-  height: 55px;
-
-  flex-shrink: 0;
-
   align-items: center;
   justify-content: space-between;
 
-  padding: 0 12px;
+  gap: 30px;
 
-  border-bottom: 1px solid var(--border);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.12);
 
-  background: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.mobile-title {
+.brand {
   display: flex;
   align-items: center;
-  gap: 7px;
-
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.mobile-logo {
-  width: 26px;
-  height: 26px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 7px;
-
-  background: var(--black);
-  color: #ffffff;
-
-  font-size: 9px;
-  font-weight: 700;
-}
-
-.icon-btn {
-  width: 36px;
-  height: 36px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border: none;
-  border-radius: 8px;
-
-  background: transparent;
-
-  color: var(--text);
-
-  font-size: 20px;
-
-  transition: background 0.15s ease;
-}
-
-.icon-btn:hover {
-  background: var(--sidebar-hover);
-}
-
-/* ========================================
-   CHAT CONTAINER
-======================================== */
-
-.chat-container {
-  flex: 1;
-
-  min-height: 0;
-
-  overflow-y: auto;
-
-  scroll-behavior: smooth;
-}
-
-/* ========================================
-   WELCOME SCREEN
-======================================== */
-
-.welcome-screen {
-  width: min(760px, calc(100% - 40px));
-
-  margin: 0 auto;
-
-  padding-top: 14vh;
-  padding-bottom: 50px;
-
-  text-align: center;
-}
-
-.welcome-logo {
-  width: 62px;
-  height: 62px;
-
-  margin: 0 auto 22px;
-
-  border-radius: 17px;
-
-  font-size: 20px;
-}
-
-.welcome-screen h1 {
-  font-size: 30px;
-  line-height: 1.25;
-
-  font-weight: 600;
-
-  letter-spacing: -0.025em;
-}
-
-.welcome-description {
-  max-width: 600px;
-
-  margin: 14px auto 34px;
-
-  color: var(--muted);
-
-  font-size: 15px;
-  line-height: 1.6;
-}
-
-/* ========================================
-   SUGGESTIONS
-======================================== */
-
-.suggestion-grid {
-  display: grid;
-
-  grid-template-columns: repeat(2, 1fr);
-
   gap: 12px;
-
-  text-align: left;
 }
 
-.suggestion-card {
-  min-height: 84px;
-
-  display: flex;
-  align-items: center;
-  gap: 13px;
-
-  padding: 15px;
-
-  border: 1px solid var(--border);
-  border-radius: 12px;
-
-  background: #ffffff;
-  color: var(--text);
-
-  text-align: left;
-
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.suggestion-card:hover {
-  background: #fafafa;
-  border-color: #cccccc;
-
-  transform: translateY(-1px);
-
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
-}
-
-.suggestion-card:active {
-  transform: translateY(0);
-}
-
-.suggestion-icon {
-  width: 34px;
-  height: 34px;
-
-  flex-shrink: 0;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 9px;
-
-  background: #f0f0f0;
-
-  color: #333333;
-
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.suggestion-text {
-  min-width: 0;
-}
-
-.suggestion-card strong {
-  display: block;
-
-  margin-bottom: 4px;
-
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.suggestion-card small {
-  display: block;
-
-  color: var(--muted);
-
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-/* ========================================
-   MESSAGES
-======================================== */
-
-.messages {
-  width: min(820px, calc(100% - 40px));
-
-  margin: 0 auto;
-
-  padding: 30px 0 40px;
-}
-
-.message {
-  display: flex;
-  gap: 13px;
-
-  margin-bottom: 28px;
-}
-
-.message-avatar {
-  width: 31px;
-  height: 31px;
-
-  flex-shrink: 0;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 8px;
-
-  font-size: 12px;
-}
-
-.message.user .message-avatar {
-  background: #e9e9e9;
-}
-
-.message.assistant .message-avatar {
-  background: var(--black);
-  color: #ffffff;
-}
-
-.message-content {
-  min-width: 0;
-
-  padding-top: 4px;
-
-  font-size: 14px;
-  line-height: 1.65;
-
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.message.user .message-content {
-  font-weight: 450;
-}
-
-.message.assistant .message-content {
-  color: #292929;
-}
-
-/* ========================================
-   TYPING INDICATOR
-======================================== */
-
-.typing {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-
-  height: 22px;
-}
-
-.typing span {
-  width: 6px;
-  height: 6px;
+.brand-mark {
+  width: 44px;
+  height: 44px;
 
   border-radius: 50%;
 
-  background: #777777;
-
-  animation: typing 1.2s infinite ease-in-out;
-}
-
-.typing span:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.typing span:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-@keyframes typing {
-  0%,
-  60%,
-  100% {
-    opacity: 0.25;
-    transform: translateY(0);
-  }
-
-  30% {
-    opacity: 1;
-    transform: translateY(-3px);
-  }
-}
-
-/* ========================================
-   INPUT SECTION
-======================================== */
-
-.input-section {
-  width: min(820px, calc(100% - 40px));
-
-  margin: 0 auto;
-
-  padding: 10px 0 18px;
-
-  background: var(--background);
-}
-
-.chat-form {
-  width: 100%;
-}
-
-.input-wrapper {
-  position: relative;
-
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: center;
 
-  min-height: 56px;
+  font-weight: 900;
+  font-size: 14px;
 
-  padding: 8px 8px 8px 16px;
+  background: var(--orange);
+  color: white;
 
-  border: 1px solid #d6d6d6;
-  border-radius: 17px;
-
-  background: var(--input);
-
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 4px 15px rgba(0, 0, 0, 0.03);
-
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+  border: 3px solid white;
 }
 
-.input-wrapper:focus-within {
-  border-color: #a9a9a9;
-
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 4px 20px rgba(0, 0, 0, 0.05);
+.brand-name {
+  font-size: 20px;
+  font-weight: 800;
 }
 
-#messageInput {
-  flex: 1;
+.brand-subtitle {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 1px;
+}
 
-  width: 100%;
+.nav {
+  display: flex;
+  gap: 4px;
+}
 
-  resize: none;
-
-  max-height: 180px;
-
-  padding: 8px 5px;
-
+.nav-button {
   border: none;
-  outline: none;
-
   background: transparent;
 
-  color: var(--text);
+  color: rgba(255, 255, 255, 0.7);
+
+  padding: 10px 14px;
+
+  border-radius: 10px;
+
+  cursor: pointer;
 
   font-size: 14px;
-  line-height: 1.5;
+  font-weight: 700;
+
+  transition: 0.2s;
 }
 
-#messageInput::placeholder {
-  color: #888888;
+.nav-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
 }
 
-/* Send Button */
+.nav-button.active {
+  background: white;
+  color: var(--blue);
+}
 
-.send-btn {
-  width: 38px;
-  height: 38px;
 
-  flex-shrink: 0;
+/* =========================================
+   MAIN
+   ========================================= */
+
+.container {
+  width: min(1200px, 92%);
+  margin: 0 auto;
+  padding: 40px 0 70px;
+}
+
+.section {
+  display: none;
+}
+
+.section.active {
+  display: block;
+}
+
+
+/* =========================================
+   HERO
+   ========================================= */
+
+.hero {
+  background:
+    linear-gradient(
+      135deg,
+      var(--blue),
+      #06499e
+    );
+
+  color: white;
+
+  border-radius: 24px;
+
+  padding: 44px;
+
+  min-height: 230px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  overflow: hidden;
+
+  position: relative;
+
+  box-shadow:
+    0 15px 35px rgba(0, 45, 114, 0.2);
+}
+
+.hero::after {
+  content: "NY";
+
+  position: absolute;
+
+  right: -30px;
+  bottom: -85px;
+
+  font-size: 250px;
+  font-weight: 900;
+
+  color: rgba(255, 255, 255, 0.05);
+
+  pointer-events: none;
+}
+
+.eyebrow {
+  color: var(--orange);
+
+  font-size: 12px;
+  font-weight: 900;
+
+  letter-spacing: 1.4px;
+
+  display: block;
+
+  margin-bottom: 7px;
+}
+
+.hero .eyebrow {
+  color: #ffb89b;
+}
+
+.hero h1 {
+  font-size: clamp(40px, 7vw, 68px);
+
+  line-height: 1;
+
+  margin-bottom: 12px;
+}
+
+.hero p {
+  font-size: 17px;
+  opacity: 0.8;
+}
+
+.hero-season {
+  position: relative;
+  z-index: 2;
+
+  font-size: 48px;
+  font-weight: 900;
+
+  border-left: 2px solid rgba(255,255,255,0.2);
+
+  padding-left: 30px;
+}
+
+
+/* =========================================
+   CARDS
+   ========================================= */
+
+.cards {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 16px;
+
+  margin-top: 20px;
+}
+
+.card {
+  background: var(--surface);
+
+  border: 1px solid var(--border);
+
+  border-radius: var(--radius);
+
+  padding: 22px;
+
+  box-shadow:
+    0 4px 15px rgba(15, 23, 42, 0.04);
+}
+
+.card-label {
+  font-size: 11px;
+  font-weight: 900;
+
+  color: var(--muted);
+
+  letter-spacing: 1px;
+
+  margin-bottom: 10px;
+}
+
+.card-value {
+  font-size: 29px;
+  font-weight: 900;
+
+  color: var(--blue);
+}
+
+.card-sub {
+  margin-top: 5px;
+
+  color: var(--muted);
+
+  font-size: 13px;
+}
+
+
+/* =========================================
+   SECTION HEADINGS
+   ========================================= */
+
+.section-heading {
+  margin-top: 40px;
+  margin-bottom: 16px;
+
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.section-heading h2,
+.page-header h1 {
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+
+/* =========================================
+   PAGE HEADER
+   ========================================= */
+
+.page-header {
+  display: flex;
+
+  align-items: end;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin-bottom: 25px;
+}
+
+.page-header p {
+  color: var(--muted);
+
+  margin-top: 8px;
+}
+
+
+/* =========================================
+   BUTTONS
+   ========================================= */
+
+.secondary-button {
+  border: 1px solid var(--border);
+
+  background: white;
+
+  color: var(--blue);
+
+  border-radius: 10px;
+
+  padding: 10px 16px;
+
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.secondary-button:hover {
+  border-color: var(--blue);
+  transform: translateY(-1px);
+}
+
+
+/* =========================================
+   GAMES
+   ========================================= */
+
+.game-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 12px;
+}
+
+.game {
+  background: var(--surface);
+
+  border: 1px solid var(--border);
+
+  border-radius: var(--radius);
+
+  padding: 20px;
+
+  display: grid;
+
+  grid-template-columns:
+    120px 1fr 120px;
+
+  align-items: center;
+
+  gap: 20px;
+
+  transition: 0.2s;
+}
+
+.game:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 8px 25px rgba(15, 23, 42, 0.08);
+}
+
+.game-date {
+  font-size: 13px;
+
+  font-weight: 800;
+
+  color: var(--muted);
+}
+
+.game-teams {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 24px;
+
+  font-weight: 900;
+
+  font-size: 17px;
+}
+
+.team-name {
+  min-width: 120px;
+  text-align: center;
+}
+
+.team-name.mets {
+  color: var(--blue);
+}
+
+.game-score {
+  font-size: 20px;
+
+  font-weight: 900;
+
+  color: var(--text);
+}
+
+.game-status {
+  text-align: right;
+
+  font-size: 12px;
+
+  font-weight: 800;
+
+  color: var(--muted);
+}
+
+.win {
+  color: #15803d;
+}
+
+.loss {
+  color: #dc2626;
+}
+
+
+/* =========================================
+   QUICK GRID
+   ========================================= */
+
+.quick-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 15px;
+}
+
+.quick-card {
+  border: 1px solid var(--border);
+
+  background: white;
+
+  border-radius: var(--radius);
+
+  padding: 22px;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 7px;
+
+  transition: 0.2s;
+}
+
+.quick-card:hover {
+  transform: translateY(-3px);
+
+  border-color: var(--orange);
+
+  box-shadow:
+    0 10px 25px rgba(15, 23, 42, 0.08);
+}
+
+.quick-card strong {
+  font-size: 17px;
+}
+
+.quick-card > span:last-child {
+  color: var(--muted);
+
+  font-size: 13px;
+}
+
+.quick-icon {
+  font-size: 25px;
+
+  margin-bottom: 3px;
+}
+
+
+/* =========================================
+   ROSTER
+   ========================================= */
+
+.roster-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 14px;
+}
+
+.player-card {
+  background: white;
+
+  border: 1px solid var(--border);
+
+  border-radius: var(--radius);
+
+  padding: 18px;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.player-card:hover {
+  transform: translateY(-3px);
+
+  border-color: var(--orange);
+
+  box-shadow:
+    0 10px 25px rgba(15, 23, 42, 0.08);
+}
+
+.player-top {
+  display: flex;
+
+  align-items: center;
+
+  gap: 14px;
+}
+
+.player-number {
+  width: 44px;
+  height: 44px;
+
+  background: var(--blue);
+
+  color: white;
+
+  border-radius: 12px;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
+  font-weight: 900;
+}
+
+.player-name {
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.player-position {
+  font-size: 12px;
+
+  color: var(--muted);
+
+  margin-top: 3px;
+}
+
+
+/* =========================================
+   TABLE
+   ========================================= */
+
+.table-container {
+  overflow-x: auto;
+
+  background: white;
+
+  border-radius: var(--radius);
+
+  border: 1px solid var(--border);
+}
+
+.stats-table {
+  width: 100%;
+
+  border-collapse: collapse;
+
+  min-width: 750px;
+}
+
+.stats-table th {
+  background: var(--blue);
+
+  color: white;
+
+  text-align: left;
+
+  padding: 13px;
+
+  font-size: 11px;
+
+  letter-spacing: 0.5px;
+}
+
+.stats-table td {
+  padding: 14px;
+
+  border-bottom: 1px solid var(--border);
+
+  font-size: 13px;
+}
+
+.stats-table tr:last-child td {
+  border-bottom: none;
+}
+
+.stats-table tr:hover td {
+  background: #f8fafc;
+}
+
+.player-link {
+  color: var(--blue);
+
+  font-weight: 800;
+
   border: none;
-  border-radius: 10px;
 
-  background: var(--black);
-  color: #ffffff;
+  background: none;
 
-  font-size: 21px;
-  font-weight: 400;
-
-  transition:
-    background 0.15s ease,
-    opacity 0.15s ease,
-    transform 0.1s ease;
+  cursor: pointer;
 }
 
-.send-btn:hover {
-  background: var(--dark-gray);
+
+/* =========================================
+   TRANSACTIONS
+   ========================================= */
+
+.transaction-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 10px;
 }
 
-.send-btn:active {
-  transform: scale(0.95);
+.transaction {
+  background: white;
+
+  border: 1px solid var(--border);
+
+  border-radius: 14px;
+
+  padding: 18px;
+
+  display: flex;
+
+  gap: 18px;
+
+  align-items: center;
 }
 
-.send-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
+.transaction-date {
+  color: var(--muted);
+
+  font-size: 12px;
+
+  font-weight: 800;
+
+  min-width: 90px;
 }
 
-.input-disclaimer {
-  padding-top: 8px;
-
-  color: #8a8a8a;
-
-  font-size: 10px;
-
-  text-align: center;
+.transaction-player {
+  font-weight: 900;
 }
 
-/* ========================================
-   MOBILE SIDEBAR OVERLAY
-======================================== */
+.transaction-type {
+  margin-left: auto;
 
-.sidebar-overlay {
-  display: none;
+  font-size: 12px;
 
+  font-weight: 900;
+
+  color: var(--blue);
+
+  background: #edf3ff;
+
+  padding: 6px 10px;
+
+  border-radius: 8px;
+}
+
+
+/* =========================================
+   MODAL
+   ========================================= */
+
+.modal {
   position: fixed;
 
   inset: 0;
 
-  z-index: 90;
+  z-index: 1000;
 
-  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 20px;
 }
 
-/* ========================================
-   SCROLLBAR
-======================================== */
-
-.chat-container::-webkit-scrollbar {
-  width: 8px;
+.modal.hidden {
+  display: none;
 }
 
-.chat-container::-webkit-scrollbar-track {
+.modal-backdrop {
+  position: absolute;
+
+  inset: 0;
+
+  background: rgba(2, 13, 35, 0.7);
+
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  position: relative;
+
+  z-index: 2;
+
+  width: min(600px, 100%);
+
+  max-height: 85vh;
+
+  overflow-y: auto;
+
+  background: white;
+
+  border-radius: 22px;
+
+  padding: 30px;
+
+  box-shadow:
+    0 25px 80px rgba(0,0,0,0.3);
+}
+
+.modal-close {
+  position: absolute;
+
+  right: 18px;
+  top: 15px;
+
+  border: none;
+
   background: transparent;
+
+  font-size: 30px;
+
+  cursor: pointer;
+
+  color: var(--muted);
 }
 
-.chat-container::-webkit-scrollbar-thumb {
-  background: #d5d5d5;
-  border-radius: 10px;
+.player-modal-name {
+  font-size: 32px;
+
+  font-weight: 900;
+
+  color: var(--blue);
+
+  margin-bottom: 6px;
 }
 
-.chat-container::-webkit-scrollbar-thumb:hover {
-  background: #bbbbbb;
+.player-modal-info {
+  color: var(--muted);
+
+  margin-bottom: 25px;
 }
 
-/* ========================================
+.player-stat-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 10px;
+}
+
+.player-stat {
+  background: var(--background);
+
+  border-radius: 12px;
+
+  padding: 15px;
+}
+
+.player-stat-label {
+  font-size: 10px;
+
+  color: var(--muted);
+
+  font-weight: 800;
+}
+
+.player-stat-value {
+  font-size: 21px;
+
+  font-weight: 900;
+
+  color: var(--blue);
+
+  margin-top: 4px;
+}
+
+
+/* =========================================
+   LOADING
+   ========================================= */
+
+.loading {
+  background: white;
+
+  border: 1px solid var(--border);
+
+  border-radius: var(--radius);
+
+  padding: 35px;
+
+  text-align: center;
+
+  color: var(--muted);
+}
+
+
+/* =========================================
+   FOOTER
+   ========================================= */
+
+footer {
+  border-top: 1px solid var(--border);
+
+  background: white;
+
+  padding: 25px 5%;
+
+  display: flex;
+
+  justify-content: space-between;
+
+  color: var(--muted);
+
+  font-size: 12px;
+}
+
+
+/* =========================================
    MOBILE
-======================================== */
+   ========================================= */
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
 
-  .sidebar {
-    position: fixed;
+  .topbar {
+    flex-direction: column;
 
-    left: 0;
-    top: 0;
-    bottom: 0;
+    align-items: flex-start;
 
-    z-index: 100;
+    padding: 15px 4%;
 
-    transform: translateX(-100%);
-
-    transition: transform 0.2s ease;
+    gap: 12px;
   }
 
-  .sidebar.open {
-    transform: translateX(0);
+  .nav {
+    width: 100%;
+
+    overflow-x: auto;
   }
 
-  .sidebar-overlay.open {
-    display: block;
+  .nav-button {
+    white-space: nowrap;
   }
 
-  .mobile-header {
-    display: flex;
+  .cards {
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 
-  .welcome-screen {
-    width: calc(100% - 28px);
-
-    padding-top: 10vh;
+  .quick-grid {
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 
-  .welcome-logo {
-    width: 56px;
-    height: 56px;
-
-    margin-bottom: 18px;
-
-    font-size: 18px;
+  .roster-grid {
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 
-  .welcome-screen h1 {
-    font-size: 25px;
+  .game {
+    grid-template-columns: 1fr;
+
+    text-align: center;
   }
 
-  .welcome-description {
-    font-size: 14px;
-
-    margin-bottom: 28px;
+  .game-status {
+    text-align: center;
   }
 
-  .suggestion-grid {
+  .game-date {
+    text-align: center;
+  }
+
+}
+
+@media (max-width: 600px) {
+
+  .container {
+    width: 94%;
+
+    padding-top: 25px;
+  }
+
+  .hero {
+    padding: 30px;
+
+    min-height: 210px;
+  }
+
+  .hero-season {
+    display: none;
+  }
+
+  .cards {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .card-value {
+    font-size: 24px;
+  }
+
+  .quick-grid {
     grid-template-columns: 1fr;
   }
 
-  .suggestion-card {
-    min-height: 76px;
+  .roster-grid {
+    grid-template-columns: 1fr;
   }
 
-  .messages {
-    width: calc(100% - 28px);
+  .page-header {
+    align-items: flex-start;
 
-    padding-top: 24px;
+    flex-direction: column;
   }
 
-  .message {
-    gap: 10px;
+  footer {
+    flex-direction: column;
 
-    margin-bottom: 24px;
+    gap: 8px;
   }
 
-  .message-avatar {
-    width: 29px;
-    height: 29px;
-  }
+  .game-teams {
+    gap: 8px;
 
-  .message-content {
     font-size: 14px;
   }
 
-  .input-section {
-    width: calc(100% - 24px);
-
-    padding-bottom: 12px;
+  .team-name {
+    min-width: 90px;
   }
 
-  .input-disclaimer {
-    font-size: 9px;
-  }
-}
-
-/* ========================================
-   SMALL PHONES
-======================================== */
-
-@media (max-width: 420px) {
-
-  .welcome-screen {
-    width: calc(100% - 24px);
-  }
-
-  .welcome-screen h1 {
-    font-size: 23px;
-  }
-
-  .welcome-description {
-    font-size: 13px;
-  }
-
-  .suggestion-card {
-    min-height: 72px;
-
-    padding: 13px;
-  }
-
-  .suggestion-icon {
-    width: 31px;
-    height: 31px;
-
-    font-size: 14px;
-  }
 }
