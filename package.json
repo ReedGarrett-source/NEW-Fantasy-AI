@@ -1,7 +1,7 @@
 {
-  "name": "fantasy-ai",
+  "name": "mets-hq",
   "version": "1.0.0",
-  "description": "AI-powered fantasy football assistant",
+  "description": "Mets HQ - New York Mets interactive fan dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,7 +11,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "express": "^5.1.0",
-    "openai": "^5.19.1"
+    "express": "^5.1.0"
   }
 }
