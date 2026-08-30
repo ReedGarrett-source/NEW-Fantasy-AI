@@ -50,38 +50,41 @@ async function mlbFetch(endpoint) {
 
 
 // ============================================================
-// DATE HELPERS
+// EASTERN DATE
 // ============================================================
 
-function easternDate(offsetDays = 0) {
+function getEasternDate(offsetDays = 0) {
 
   const now = new Date();
 
-  const easternParts =
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/New_York",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).formatToParts(now);
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-US",
+      {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }
+    ).formatToParts(now);
 
   const year =
     Number(
-      easternParts.find(
+      parts.find(
         part => part.type === "year"
       ).value
     );
 
   const month =
     Number(
-      easternParts.find(
+      parts.find(
         part => part.type === "month"
       ).value
     );
 
   const day =
     Number(
-      easternParts.find(
+      parts.find(
         part => part.type === "day"
       ).value
     );
@@ -101,7 +104,53 @@ function easternDate(offsetDays = 0) {
 
   return date
     .toISOString()
-    .split("T")[0];
+    .slice(0, 10);
+
+}
+
+
+// ============================================================
+// SAFE NUMBER
+// ============================================================
+
+function numberOrNull(value) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const number =
+    Number(value);
+
+  return Number.isFinite(number)
+    ? number
+    : null;
+
+}
+
+
+// ============================================================
+// TEAM NAME
+// ============================================================
+
+function teamName(team) {
+
+  if (!team) {
+    return "Unknown Opponent";
+  }
+
+  return (
+    team.name ||
+    team.teamName ||
+    team.clubName ||
+    team.shortName ||
+    team.abbreviation ||
+    "Unknown Opponent"
+  );
 
 }
 
@@ -113,9 +162,15 @@ function easternDate(offsetDays = 0) {
 app.get("/api/health", (req, res) => {
 
   res.json({
+
     success: true,
-    service: "Mets HQ",
-    season: CURRENT_SEASON
+
+    service:
+      "Mets HQ",
+
+    season:
+      CURRENT_SEASON
+
   });
 
 });
@@ -135,17 +190,28 @@ app.get("/api/mets/team", async (req, res) => {
       );
 
     res.json({
+
       success: true,
-      team: data.teams?.[0] || null
+
+      team:
+        data.teams?.[0] || null
+
     });
 
   } catch (error) {
 
-    console.error("TEAM:", error);
+    console.error(
+      "TEAM ERROR:",
+      error
+    );
 
     res.status(500).json({
+
       success: false,
-      error: "Unable to load Mets team."
+
+      error:
+        "Unable to load Mets team."
+
     });
 
   }
@@ -171,6 +237,7 @@ app.get("/api/mets/standings", async (req, res) => {
       );
 
     let metsRecord = null;
+
     let division = null;
 
     for (
@@ -186,8 +253,11 @@ app.get("/api/mets/standings", async (req, res) => {
 
       if (found) {
 
-        metsRecord = found;
-        division = record;
+        metsRecord =
+          found;
+
+        division =
+          record;
 
         break;
 
@@ -196,19 +266,32 @@ app.get("/api/mets/standings", async (req, res) => {
     }
 
     res.json({
+
       success: true,
+
       season,
-      mets: metsRecord,
+
+      mets:
+        metsRecord,
+
       division
+
     });
 
   } catch (error) {
 
-    console.error("STANDINGS:", error);
+    console.error(
+      "STANDINGS ERROR:",
+      error
+    );
 
     res.status(500).json({
+
       success: false,
-      error: "Unable to load Mets standings."
+
+      error:
+        "Unable to load Mets standings."
+
     });
 
   }
@@ -217,7 +300,14 @@ app.get("/api/mets/standings", async (req, res) => {
 
 
 // ============================================================
-// GAMES
+// SCHEDULE
+//
+// IMPORTANT:
+// We deliberately convert the MLB response into our own
+// simple format here.
+//
+// The frontend should NEVER have to figure out whether
+// home.team.name or away.team.teamName is the opponent.
 // ============================================================
 
 app.get("/api/mets/games", async (req, res) => {
@@ -226,32 +316,41 @@ app.get("/api/mets/games", async (req, res) => {
 
     const startDate =
       req.query.startDate ||
-      easternDate(0);
+      getEasternDate(0);
 
     const endDate =
       req.query.endDate ||
-      easternDate(21);
+      getEasternDate(30);
+
+    const endpoint =
+      `/schedule?sportId=1` +
+      `&teamId=${METS_ID}` +
+      `&startDate=${startDate}` +
+      `&endDate=${endDate}` +
+      `&hydrate=team,linescore,probablePitcher`;
 
     const data =
-      await mlbFetch(
-        `/schedule?teamId=${METS_ID}&sportId=1&startDate=${startDate}&endDate=${endDate}&hydrate=team,linescore,probablePitcher`
-      );
+      await mlbFetch(endpoint);
 
     const games = [];
 
     for (
-      const date of data.dates || []
+      const dateBlock of data.dates || []
     ) {
 
       for (
-        const game of date.games || []
+        const game of dateBlock.games || []
       ) {
 
         const home =
-          game.teams?.home || {};
+          game.teams?.home;
 
         const away =
-          game.teams?.away || {};
+          game.teams?.away;
+
+        if (!home || !away) {
+          continue;
+        }
 
         const homeTeam =
           home.team || {};
@@ -264,6 +363,15 @@ app.get("/api/mets/games", async (req, res) => {
 
         const awayId =
           Number(awayTeam.id);
+
+        // Only accept games where the Mets are
+        // explicitly one of the two teams.
+        if (
+          homeId !== METS_ID &&
+          awayId !== METS_ID
+        ) {
+          continue;
+        }
 
         const metsIsHome =
           homeId === METS_ID;
@@ -281,6 +389,28 @@ app.get("/api/mets/games", async (req, res) => {
         const opponentTeam =
           opponentSide.team || {};
 
+        const metsTeam =
+          metsSide.team || {};
+
+        const opponentId =
+          Number(opponentTeam.id);
+
+        // This is the critical part:
+        // get the name directly from the actual
+        // opponent team object.
+        const opponentName =
+          teamName(opponentTeam);
+
+        const metsScore =
+          numberOrNull(
+            metsSide.score
+          );
+
+        const opponentScore =
+          numberOrNull(
+            opponentSide.score
+          );
+
         games.push({
 
           gamePk:
@@ -290,58 +420,91 @@ app.get("/api/mets/games", async (req, res) => {
             game.gameDate,
 
           officialDate:
-            game.officialDate,
+            game.officialDate ||
+            dateBlock.date,
 
           status:
             game.status || {},
 
-          seriesDescription:
-            game.seriesDescription || "",
-
           gameType:
             game.gameType || "",
 
-          metsIsHome,
+          seriesDescription:
+            game.seriesDescription || "",
+
+          metsIsHome:
+
+            metsIsHome,
 
           location:
+
             metsIsHome
               ? "vs."
               : "@",
 
-          opponent: {
+          mets: {
 
             id:
-              Number(opponentTeam.id) || null,
+              METS_ID,
 
             name:
-              opponentTeam.name ||
-              opponentTeam.teamName ||
-              opponentTeam.clubName ||
-              "Unknown Opponent",
-
-            abbreviation:
-              opponentTeam.abbreviation ||
-              ""
+              teamName(metsTeam)
 
           },
 
-          metsScore:
-            typeof metsSide.score === "number"
-              ? metsSide.score
-              : null,
+          opponent: {
 
-          opponentScore:
-            typeof opponentSide.score === "number"
-              ? opponentSide.score
-              : null,
+            id:
+              Number.isFinite(opponentId)
+                ? opponentId
+                : null,
+
+            name:
+              opponentName
+
+          },
+
+          metsScore,
+
+          opponentScore,
 
           probablePitcher:
-            metsSide.probablePitcher ||
-            null,
+            metsSide.probablePitcher
+              ? {
+                  id:
+                    metsSide
+                      .probablePitcher
+                      .id,
+
+                  name:
+                    metsSide
+                      .probablePitcher
+                      .fullName ||
+                    metsSide
+                      .probablePitcher
+                      .name ||
+                    "TBD"
+                }
+              : null,
 
           opponentProbablePitcher:
-            opponentSide.probablePitcher ||
-            null
+            opponentSide.probablePitcher
+              ? {
+                  id:
+                    opponentSide
+                      .probablePitcher
+                      .id,
+
+                  name:
+                    opponentSide
+                      .probablePitcher
+                      .fullName ||
+                    opponentSide
+                      .probablePitcher
+                      .name ||
+                    "TBD"
+                }
+              : null
 
         });
 
@@ -355,20 +518,49 @@ app.get("/api/mets/games", async (req, res) => {
         new Date(b.gameDate)
     );
 
+    console.log(
+      `Returning ${games.length} Mets games from ${startDate} through ${endDate}`
+    );
+
+    if (games.length > 0) {
+
+      console.log(
+        "FIRST GAME:",
+        JSON.stringify(
+          games[0],
+          null,
+          2
+        )
+      );
+
+    }
+
     res.json({
+
       success: true,
+
       startDate,
+
       endDate,
+
       games
+
     });
 
   } catch (error) {
 
-    console.error("GAMES:", error);
+    console.error(
+      "GAMES ERROR:",
+      error
+    );
 
     res.status(500).json({
+
       success: false,
-      error: "Unable to load Mets games."
+
+      error:
+        "Unable to load Mets games."
+
     });
 
   }
@@ -378,46 +570,56 @@ app.get("/api/mets/games", async (req, res) => {
 
 // ============================================================
 // LAST 10 GAMES
+//
+// We DO NOT use standings.lastTen.
+// We independently retrieve the schedule and calculate
+// the record from completed games.
+//
+// This avoids MLB returning an object/string/empty value
+// depending on the standings response.
 // ============================================================
 
 app.get("/api/mets/last10", async (req, res) => {
 
   try {
 
-    const today =
-      easternDate(0);
+    const endDate =
+      getEasternDate(0);
 
-    // Look back far enough to account for off-days.
+    // 60 days gives us plenty of room for rainouts,
+// off days, etc.
     const startDate =
-      easternDate(-30);
+      getEasternDate(-60);
+
+    const endpoint =
+      `/schedule?sportId=1` +
+      `&teamId=${METS_ID}` +
+      `&startDate=${startDate}` +
+      `&endDate=${endDate}` +
+      `&hydrate=team,linescore`;
 
     const data =
-      await mlbFetch(
-        `/schedule?teamId=${METS_ID}&sportId=1&startDate=${startDate}&endDate=${today}&hydrate=team,linescore`
-      );
+      await mlbFetch(endpoint);
 
-    const completed = [];
+    const completedGames = [];
 
     for (
-      const date of data.dates || []
+      const dateBlock of data.dates || []
     ) {
 
       for (
-        const game of date.games || []
+        const game of dateBlock.games || []
       ) {
 
-        if (
-          game.status?.abstractGameState !==
-          "Final"
-        ) {
-          continue;
-        }
-
         const home =
-          game.teams?.home || {};
+          game.teams?.home;
 
         const away =
-          game.teams?.away || {};
+          game.teams?.away;
+
+        if (!home || !away) {
+          continue;
+        }
 
         const homeId =
           Number(home.team?.id);
@@ -425,51 +627,85 @@ app.get("/api/mets/last10", async (req, res) => {
         const awayId =
           Number(away.team?.id);
 
-        const metsIsHome =
-          homeId === METS_ID;
-
-        const mets =
-          metsIsHome
-            ? home
-            : away;
-
-        const opponent =
-          metsIsHome
-            ? away
-            : home;
-
-        const metsScore =
-          Number(mets.score);
-
-        const opponentScore =
-          Number(opponent.score);
-
         if (
-          !Number.isFinite(metsScore) ||
-          !Number.isFinite(opponentScore)
+          homeId !== METS_ID &&
+          awayId !== METS_ID
         ) {
           continue;
         }
 
-        completed.push({
+        const isHome =
+          homeId === METS_ID;
+
+        const metsSide =
+          isHome
+            ? home
+            : away;
+
+        const opponentSide =
+          isHome
+            ? away
+            : home;
+
+        const status =
+          game.status || {};
+
+        // Accept MLB's normal final states.
+        const isFinal =
+          status.abstractGameState ===
+            "Final" ||
+          status.detailedState ===
+            "Final" ||
+          status.statusCode ===
+            "F";
+
+        if (!isFinal) {
+          continue;
+        }
+
+        const metsScore =
+          numberOrNull(
+            metsSide.score
+          );
+
+        const opponentScore =
+          numberOrNull(
+            opponentSide.score
+          );
+
+        if (
+          metsScore === null ||
+          opponentScore === null
+        ) {
+          continue;
+        }
+
+        completedGames.push({
+
+          gamePk:
+            game.gamePk,
 
           gameDate:
             game.gameDate,
+
+          opponent:
+            teamName(
+              opponentSide.team
+            ),
+
+          metsIsHome:
+            isHome,
 
           metsScore,
 
           opponentScore,
 
-          opponent:
-            opponent.team?.name ||
-            opponent.team?.teamName ||
-            "Unknown Opponent",
-
-          win:
-            metsScore > opponentScore,
-
-          loss:
-            metsScore < opponentScore
+          result:
+            metsScore > opponentScore
+              ? "W"
+              : metsScore < opponentScore
+                ? "L"
+                : "T"
 
         });
 
@@ -477,51 +713,99 @@ app.get("/api/mets/last10", async (req, res) => {
 
     }
 
-    completed.sort(
+    // Most recent first.
+    completedGames.sort(
       (a, b) =>
         new Date(b.gameDate) -
         new Date(a.gameDate)
     );
 
     const last10 =
-      completed.slice(0, 10);
+      completedGames.slice(
+        0,
+        10
+      );
 
-    const wins =
-      last10.filter(
-        game => game.win
-      ).length;
+    let wins = 0;
+    let losses = 0;
+    let ties = 0;
 
-    const losses =
-      last10.filter(
-        game => game.loss
-      ).length;
+    for (
+      const game of last10
+    ) {
+
+      if (game.result === "W") {
+        wins++;
+      }
+
+      else if (
+        game.result === "L"
+      ) {
+        losses++;
+      }
+
+      else {
+        ties++;
+      }
+
+    }
+
+    const record =
+      `${wins}-${losses}` +
+      (
+        ties > 0
+          ? `-${ties}`
+          : ""
+      );
+
+    console.log(
+      "LAST 10:",
+      record
+    );
+
+    console.log(
+      "LAST 10 GAMES:",
+      JSON.stringify(
+        last10,
+        null,
+        2
+      )
+    );
 
     res.json({
 
       success: true,
 
-      record:
-        `${wins}-${losses}`,
+      record,
 
       wins,
 
       losses,
 
+      ties,
+
       games:
-        last10
+        last10,
+
+      gamesFound:
+        last10.length
 
     });
 
   } catch (error) {
 
     console.error(
-      "LAST 10:",
+      "LAST 10 ERROR:",
       error
     );
 
     res.status(500).json({
+
       success: false,
-      error: "Unable to calculate last 10 games."
+
+      error:
+        "Unable to calculate Mets last 10."
+
     });
 
   }
@@ -531,6 +815,8 @@ app.get("/api/mets/last10", async (req, res) => {
 
 // ============================================================
 // ACTIVE ROSTER
+//
+// Use active roster as the primary current roster.
 // ============================================================
 
 app.get("/api/mets/roster", async (req, res) => {
@@ -546,8 +832,57 @@ app.get("/api/mets/roster", async (req, res) => {
         `/teams/${METS_ID}/roster?season=${season}&rosterType=active&hydrate=person`
       );
 
-    const roster =
-      data.roster || [];
+    res.json({
+
+      success: true,
+
+      season,
+
+      roster:
+        data.roster || []
+
+    });
+
+  } catch (error) {
+
+    console.error(
+      "ROSTER ERROR:",
+      error
+    );
+
+    res.status(500).json({
+
+      success: false,
+
+      error:
+        "Unable to load active Mets roster."
+
+    });
+
+  }
+
+});
+
+
+// ============================================================
+// FULL ROSTER
+//
+// Used as a backup so a player isn't lost merely because
+// MLB's active-roster endpoint has a temporary discrepancy.
+// ============================================================
+
+app.get("/api/mets/full-roster", async (req, res) => {
+
+  try {
+
+    const season =
+      Number(req.query.season) ||
+      CURRENT_SEASON;
+
+    const data =
+      await mlbFetch(
+        `/teams/${METS_ID}/roster?season=${season}&rosterType=fullRoster&hydrate=person`
+      );
 
     res.json({
 
@@ -555,23 +890,25 @@ app.get("/api/mets/roster", async (req, res) => {
 
       season,
 
-      rosterType:
-        "active",
-
-      roster
+      roster:
+        data.roster || []
 
     });
 
   } catch (error) {
 
     console.error(
-      "ROSTER:",
+      "FULL ROSTER ERROR:",
       error
     );
 
     res.status(500).json({
+
       success: false,
-      error: "Unable to load active Mets roster."
+
+      error:
+        "Unable to load full Mets roster."
+
     });
 
   }
@@ -587,14 +924,20 @@ app.get("/api/mets/depth", async (req, res) => {
 
   try {
 
+    const season =
+      Number(req.query.season) ||
+      CURRENT_SEASON;
+
     const data =
       await mlbFetch(
-        `/teams/${METS_ID}/roster?rosterType=depthChart&season=${CURRENT_SEASON}&hydrate=person`
+        `/teams/${METS_ID}/roster?season=${season}&rosterType=depthChart&hydrate=person`
       );
 
     res.json({
 
       success: true,
+
+      season,
 
       roster:
         data.roster || []
@@ -604,13 +947,17 @@ app.get("/api/mets/depth", async (req, res) => {
   } catch (error) {
 
     console.error(
-      "DEPTH:",
+      "DEPTH ERROR:",
       error
     );
 
+    // Don't make the whole roster fail if depth chart
+    // isn't available.
     res.json({
 
       success: true,
+
+      season,
 
       roster: []
 
@@ -622,7 +969,17 @@ app.get("/api/mets/depth", async (req, res) => {
 
 
 // ============================================================
-// PLAYER STATS
+// STATS
+//
+// We normalize every split.
+//
+// MLB returns:
+// {
+//   player: {...},
+//   stat: {...}
+// }
+//
+// We return a very simple object.
 // ============================================================
 
 app.get("/api/mets/stats", async (req, res) => {
@@ -633,84 +990,194 @@ app.get("/api/mets/stats", async (req, res) => {
       Number(req.query.season) ||
       CURRENT_SEASON;
 
+    const endpoint =
+      `/stats` +
+      `?stats=season` +
+      `&group=hitting` +
+      `&season=${season}` +
+      `&sportIds=1` +
+      `&teamId=${METS_ID}` +
+      `&playerPool=ALL` +
+      `&gameType=R` +
+      `&limit=1000` +
+      `&hydrate=person,team`;
+
     const data =
-      await mlbFetch(
-        `/stats?stats=season&group=hitting&season=${season}&sportIds=1&teamId=${METS_ID}&playerPool=ALL&limit=200&hydrate=person,team`
-      );
+      await mlbFetch(endpoint);
 
     const splits =
       data.stats?.[0]?.splits || [];
 
-    const stats = [];
+    const statsByPlayer =
+      new Map();
 
     for (
       const split of splits
     ) {
-
-      const stat =
-        split.stat || {};
 
       const player =
         split.player ||
         split.person ||
         {};
 
-      if (!player.id) {
+      const stat =
+        split.stat ||
+        {};
+
+      const playerId =
+        Number(
+          player.id ||
+          split.playerId ||
+          split.personId
+        );
+
+      if (
+        !Number.isFinite(playerId)
+      ) {
         continue;
       }
 
-      stats.push({
+      const playerName =
+        player.fullName ||
+        player.name ||
+        "Unknown Player";
 
-        player: {
+      // If a player appears multiple times,
+      // add their statistics rather than displaying
+      // only one split.
+      const existing =
+        statsByPlayer.get(
+          playerId
+        );
 
-          id:
-            Number(player.id),
+      if (!existing) {
 
-          fullName:
-            player.fullName ||
-            player.name ||
-            "Unknown Player"
+        statsByPlayer.set(
+          playerId,
+          {
 
-        },
+            player: {
 
-        games:
-          stat.gamesPlayed ??
-          stat.games ??
-          0,
+              id:
+                playerId,
 
-        atBats:
-          stat.atBats ?? 0,
+              fullName:
+                playerName
 
-        hits:
-          stat.hits ?? 0,
+            },
 
-        homeRuns:
-          stat.homeRuns ?? 0,
+            games:
+              Number(
+                stat.gamesPlayed ||
+                stat.games ||
+                0
+              ),
 
-        rbi:
-          stat.rbi ?? 0,
+            atBats:
+              Number(
+                stat.atBats || 0
+              ),
 
-        avg:
-          stat.avg ?? ".000",
+            hits:
+              Number(
+                stat.hits || 0
+              ),
 
-        obp:
-          stat.obp ?? ".000",
+            homeRuns:
+              Number(
+                stat.homeRuns || 0
+              ),
 
-        slg:
-          stat.slg ?? ".000",
+            rbi:
+              Number(
+                stat.rbi || 0
+              ),
 
-        ops:
-          stat.ops ?? ".000"
+            avg:
+              stat.avg ?? ".000",
 
-      });
+            obp:
+              stat.obp ?? ".000",
+
+            slg:
+              stat.slg ?? ".000",
+
+            ops:
+              stat.ops ?? ".000"
+
+          }
+        );
+
+      }
+
+      else {
+
+        existing.games +=
+          Number(
+            stat.gamesPlayed ||
+            stat.games ||
+            0
+          );
+
+        existing.atBats +=
+          Number(
+            stat.atBats || 0
+          );
+
+        existing.hits +=
+          Number(
+            stat.hits || 0
+          );
+
+        existing.homeRuns +=
+          Number(
+            stat.homeRuns || 0
+          );
+
+        existing.rbi +=
+          Number(
+            stat.rbi || 0
+          );
+
+        // Recalculate slash lines from totals.
+        const ab =
+          existing.atBats;
+
+        const hits =
+          existing.hits;
+
+        const walks =
+          Number(
+            existing.walks || 0
+          );
+
+        if (ab > 0) {
+
+          existing.avg =
+            (
+              hits / ab
+            ).toFixed(3);
+
+        }
+
+      }
 
     }
 
-    // Sort by at-bats.
+    let stats =
+      Array.from(
+        statsByPlayer.values()
+      );
+
+    // Sort by AB descending.
     stats.sort(
       (a, b) =>
-        Number(b.atBats) -
-        Number(a.atBats)
+        b.atBats -
+        a.atBats
+    );
+
+    console.log(
+      `Returning ${stats.length} Mets hitters`
     );
 
     res.json({
@@ -726,13 +1193,17 @@ app.get("/api/mets/stats", async (req, res) => {
   } catch (error) {
 
     console.error(
-      "STATS:",
+      "STATS ERROR:",
       error
     );
 
     res.status(500).json({
+
       success: false,
-      error: "Unable to load Mets player statistics."
+
+      error:
+        "Unable to load Mets player statistics."
+
     });
 
   }
@@ -751,11 +1222,17 @@ app.get("/api/player/:id", async (req, res) => {
     const playerId =
       Number(req.params.id);
 
-    if (!playerId) {
+    if (
+      !Number.isFinite(playerId)
+    ) {
 
       return res.status(400).json({
+
         success: false,
-        error: "Invalid player ID."
+
+        error:
+          "Invalid player ID."
+
       });
 
     }
@@ -777,13 +1254,17 @@ app.get("/api/player/:id", async (req, res) => {
   } catch (error) {
 
     console.error(
-      "PLAYER:",
+      "PLAYER ERROR:",
       error
     );
 
     res.status(500).json({
+
       success: false,
-      error: "Unable to load player."
+
+      error:
+        "Unable to load player."
+
     });
 
   }
@@ -792,7 +1273,7 @@ app.get("/api/player/:id", async (req, res) => {
 
 
 // ============================================================
-// INDIVIDUAL PLAYER STATS
+// PLAYER STATS
 // ============================================================
 
 app.get("/api/player/:id/stats", async (req, res) => {
@@ -812,7 +1293,7 @@ app.get("/api/player/:id/stats", async (req, res) => {
 
     const data =
       await mlbFetch(
-        `/people/${playerId}/stats?stats=season&group=${group}&season=${season}`
+        `/people/${playerId}/stats?stats=season&group=${group}&season=${season}&gameType=R`
       );
 
     res.json({
@@ -827,13 +1308,17 @@ app.get("/api/player/:id/stats", async (req, res) => {
   } catch (error) {
 
     console.error(
-      "PLAYER STATS:",
+      "PLAYER STATS ERROR:",
       error
     );
 
     res.status(500).json({
+
       success: false,
-      error: "Unable to load player stats."
+
+      error:
+        "Unable to load player stats."
+
     });
 
   }
@@ -851,11 +1336,11 @@ app.get("/api/mets/transactions", async (req, res) => {
 
     const endDate =
       req.query.endDate ||
-      easternDate(0);
+      getEasternDate(0);
 
     const startDate =
       req.query.startDate ||
-      easternDate(-45);
+      getEasternDate(-45);
 
     const data =
       await mlbFetch(
@@ -902,8 +1387,12 @@ app.get("/api/mets/transactions", async (req, res) => {
 
     transactions.sort(
       (a, b) =>
-        new Date(b.date || 0) -
-        new Date(a.date || 0)
+        new Date(
+          b.date || 0
+        ) -
+        new Date(
+          a.date || 0
+        )
     );
 
     res.json({
@@ -921,13 +1410,17 @@ app.get("/api/mets/transactions", async (req, res) => {
   } catch (error) {
 
     console.error(
-      "TRANSACTIONS:",
+      "TRANSACTIONS ERROR:",
       error
     );
 
     res.status(500).json({
+
       success: false,
-      error: "Unable to load Mets transactions."
+
+      error:
+        "Unable to load Mets transactions."
+
     });
 
   }
@@ -1009,7 +1502,7 @@ app.use(
 
 
 // ============================================================
-// START
+// START SERVER
 // ============================================================
 
 app.listen(
