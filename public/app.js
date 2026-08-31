@@ -3,22 +3,29 @@ const METS_ID = 121;
 
 let allStats = [];
 let currentStatMode = "hitting";
+
 let currentSort = {
   key: null,
   direction: "desc"
 };
 
 let allRosterPlayers = [];
+let allProspects = [];
+
 let currentGameFilter = "all";
+
+let researchHistory = [];
 
 // ============================================================
 // API
 // ============================================================
 
-async function api(url) {
+async function api(url, options = {}) {
   const response = await fetch(url, {
+    ...options,
     headers: {
-      Accept: "application/json"
+      Accept: "application/json",
+      ...(options.headers || {})
     }
   });
 
@@ -27,10 +34,15 @@ async function api(url) {
   try {
     data = await response.json();
   } catch {
-    throw new Error("The server returned invalid JSON.");
+    throw new Error(
+      "The server returned invalid JSON."
+    );
   }
 
-  if (!response.ok || data?.success === false) {
+  if (
+    !response.ok ||
+    data?.success === false
+  ) {
     throw new Error(
       data?.error ||
       `Request failed with status ${response.status}`
@@ -53,17 +65,73 @@ function escapeHTML(value) {
     .replaceAll("'", "&#039;");
 }
 
-function getEasternDate() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
+function numberValue(value) {
+  const number = Number(value);
 
-  const year = parts.find(p => p.type === "year")?.value;
-  const month = parts.find(p => p.type === "month")?.value;
-  const day = parts.find(p => p.type === "day")?.value;
+  return Number.isFinite(number)
+    ? number
+    : null;
+}
+
+function displayValue(value) {
+  return (
+    value === null ||
+    value === undefined ||
+    value === ""
+  )
+    ? "—"
+    : String(value);
+}
+
+function normalizeAverage(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const numeric =
+    Number(value);
+
+  return Number.isFinite(numeric)
+    ? numeric
+    : null;
+}
+
+function getEasternDate() {
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-US",
+      {
+        timeZone:
+          "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }
+    ).formatToParts(
+      new Date()
+    );
+
+  const year =
+    parts.find(
+      p =>
+        p.type === "year"
+    )?.value;
+
+  const month =
+    parts.find(
+      p =>
+        p.type === "month"
+    )?.value;
+
+  const day =
+    parts.find(
+      p =>
+        p.type === "day"
+    )?.value;
 
   return `${year}-${month}-${day}`;
 }
@@ -73,18 +141,58 @@ function formatDate(dateString) {
     return "—";
   }
 
-  const date = new Date(dateString);
+  const date =
+    new Date(dateString);
 
-  if (Number.isNaN(date.getTime())) {
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
     return "—";
   }
 
-  return date.toLocaleDateString("en-US", {
-    timeZone: "America/New_York",
-    weekday: "short",
-    month: "short",
-    day: "numeric"
-  });
+  return date.toLocaleDateString(
+    "en-US",
+    {
+      timeZone:
+        "America/New_York",
+      weekday: "short",
+      month: "short",
+      day: "numeric"
+    }
+  );
+}
+
+function formatFullDate(
+  dateString
+) {
+  if (!dateString) {
+    return "—";
+  }
+
+  const date =
+    new Date(dateString);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "—";
+  }
+
+  return date.toLocaleDateString(
+    "en-US",
+    {
+      timeZone:
+        "America/New_York",
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    }
+  );
 }
 
 function getTeamId(team) {
@@ -92,14 +200,23 @@ function getTeamId(team) {
     return null;
   }
 
-  if (typeof team === "number") {
+  if (
+    typeof team ===
+    "number"
+  ) {
     return team;
   }
 
-  if (typeof team === "string") {
-    const numeric = Number(team);
+  if (
+    typeof team ===
+    "string"
+  ) {
+    const numeric =
+      Number(team);
 
-    return Number.isFinite(numeric)
+    return Number.isFinite(
+      numeric
+    )
       ? numeric
       : null;
   }
@@ -111,11 +228,16 @@ function getTeamId(team) {
     team.team?.teamId
   ];
 
-  for (const value of possibleIds) {
-    const numeric = Number(value);
+  for (
+    const value of possibleIds
+  ) {
+    const numeric =
+      Number(value);
 
     if (
-      Number.isFinite(numeric) &&
+      Number.isFinite(
+        numeric
+      ) &&
       numeric > 0
     ) {
       return numeric;
@@ -130,11 +252,17 @@ function getTeamName(team) {
     return "Unknown Opponent";
   }
 
-  if (typeof team === "string") {
+  if (
+    typeof team ===
+    "string"
+  ) {
     return team;
   }
 
-  if (typeof team === "number") {
+  if (
+    typeof team ===
+    "number"
+  ) {
     return "Unknown Opponent";
   }
 
@@ -149,9 +277,13 @@ function getTeamName(team) {
     team.team?.shortName
   ];
 
-  for (const candidate of candidates) {
+  for (
+    const candidate of
+    candidates
+  ) {
     if (
-      typeof candidate === "string" &&
+      typeof candidate ===
+        "string" &&
       candidate.trim()
     ) {
       return candidate.trim();
@@ -182,52 +314,25 @@ function getPlayerId(player) {
     player?.personId
   ];
 
-  for (const value of candidates) {
-    const number = Number(value);
+  for (
+    const value of candidates
+  ) {
+    const numeric =
+      Number(value);
 
     if (
-      Number.isFinite(number) &&
-      number > 0
+      Number.isFinite(
+        numeric
+      ) &&
+      numeric > 0
     ) {
-      return String(number);
+      return String(
+        numeric
+      );
     }
   }
 
   return "";
-}
-
-function numberValue(value) {
-  const number = Number(value);
-
-  return Number.isFinite(number)
-    ? number
-    : null;
-}
-
-function displayValue(value) {
-  return (
-    value === null ||
-    value === undefined ||
-    value === ""
-  )
-    ? "—"
-    : String(value);
-}
-
-function normalizeAverage(value) {
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
-    return null;
-  }
-
-  const numeric = Number(value);
-
-  return Number.isFinite(numeric)
-    ? numeric
-    : null;
 }
 
 function isPitcher(player) {
@@ -266,20 +371,18 @@ function isInfield(player) {
     ""
   ).toLowerCase();
 
-  return (
-    [
-      "1b",
-      "2b",
-      "3b",
-      "ss",
-      "c"
-    ].includes(position) ||
+  return [
+    "1b",
+    "2b",
+    "3b",
+    "ss",
+    "c"
+  ].includes(position) ||
     position.includes("first base") ||
     position.includes("second base") ||
     position.includes("third base") ||
     position.includes("shortstop") ||
-    position.includes("catcher")
-  );
+    position.includes("catcher");
 }
 
 function isOutfield(player) {
@@ -290,48 +393,94 @@ function isOutfield(player) {
     ""
   ).toLowerCase();
 
-  return (
-    [
-      "lf",
-      "cf",
-      "rf",
-      "of"
-    ].includes(position) ||
-    position.includes("outfield")
-  );
+  return [
+    "lf",
+    "cf",
+    "rf",
+    "of"
+  ].includes(position) ||
+    position.includes("outfield");
+}
+
+function formatStat(
+  value,
+  decimals = 0
+) {
+  if (
+    value === null ||
+    value === undefined ||
+    Number.isNaN(value)
+  ) {
+    return "—";
+  }
+
+  if (
+    decimals === 0
+  ) {
+    return String(
+      Math.round(
+        Number(value)
+      )
+    );
+  }
+
+  return Number(value)
+    .toFixed(decimals)
+    .replace(/^0\./, ".");
 }
 
 // ============================================================
 // NAVIGATION
 // ============================================================
 
-function showSection(sectionName) {
+function showSection(
+  sectionName
+) {
   document
-    .querySelectorAll(".section")
+    .querySelectorAll(
+      ".section"
+    )
     .forEach(section => {
-      section.classList.remove("active");
+      section.classList.remove(
+        "active"
+      );
     });
 
   document
-    .querySelectorAll(".nav-button")
+    .querySelectorAll(
+      ".nav-button"
+    )
     .forEach(button => {
-      button.classList.remove("active");
+      button.classList.remove(
+        "active"
+      );
     });
 
   document
-    .querySelectorAll(`[data-section="${sectionName}"]`)
+    .querySelectorAll(
+      `[data-section="${sectionName}"]`
+    )
     .forEach(button => {
-      if (button.classList.contains("nav-button")) {
-        button.classList.add("active");
+      if (
+        button.classList.contains(
+          "nav-button"
+        )
+      ) {
+        button.classList.add(
+          "active"
+        );
       }
     });
 
-  const section = document.getElementById(
-    `${sectionName}-section`
-  );
+  const section =
+    document.getElementById(
+      `${sectionName}-section`
+    );
 
   if (section) {
-    section.classList.add("active");
+    section.classList.add(
+      "active"
+    );
   }
 
   window.scrollTo({
@@ -339,43 +488,72 @@ function showSection(sectionName) {
     behavior: "smooth"
   });
 
-  if (sectionName === "home") {
+  if (
+    sectionName ===
+    "home"
+  ) {
     loadStandings();
     loadGames();
   }
 
-  if (sectionName === "games") {
+  if (
+    sectionName ===
+    "games"
+  ) {
     loadGames();
   }
 
-  if (sectionName === "roster") {
+  if (
+    sectionName ===
+    "roster"
+  ) {
     loadRoster();
   }
 
-  if (sectionName === "stats") {
+  if (
+    sectionName ===
+    "stats"
+  ) {
     loadStats();
   }
 
-  if (sectionName === "transactions") {
+  if (
+    sectionName ===
+    "prospects"
+  ) {
+    loadProspects();
+  }
+
+  if (
+    sectionName ===
+    "transactions"
+  ) {
     loadTransactions();
   }
 }
 
-document.addEventListener("click", event => {
-  const button = event.target.closest(
-    "[data-section]"
-  );
+document.addEventListener(
+  "click",
+  event => {
+    const button =
+      event.target.closest(
+        "[data-section]"
+      );
 
-  if (!button) {
-    return;
+    if (!button) {
+      return;
+    }
+
+    const section =
+      button.dataset.section;
+
+    if (section) {
+      showSection(
+        section
+      );
+    }
   }
-
-  const section = button.dataset.section;
-
-  if (section) {
-    showSection(section);
-  }
-});
+);
 
 // ============================================================
 // STANDINGS
@@ -383,61 +561,72 @@ document.addEventListener("click", event => {
 
 async function loadStandings() {
   try {
-    const data = await api(
-      `/api/mets/standings?season=${CURRENT_SEASON}`
-    );
+    const data =
+      await api(
+        `/api/mets/standings?season=${CURRENT_SEASON}`
+      );
 
     const mets =
       data?.mets ||
       data?.team ||
-      data?.standings?.find(team =>
-        Number(team?.team?.id) === METS_ID ||
-        Number(team?.id) === METS_ID
+      data?.standings?.find(
+        team =>
+          Number(
+            team?.team?.id
+          ) === METS_ID ||
+          Number(
+            team?.id
+          ) === METS_ID
       );
 
     if (!mets) {
-      console.warn(
-        "Could not locate Mets standings object.",
-        data
-      );
       return;
     }
 
-    const wins = numberValue(
-      mets.wins ??
-      mets.record?.wins ??
-      mets.team?.record?.wins
-    );
+    const wins =
+      numberValue(
+        mets.wins ??
+        mets.record?.wins ??
+        mets.team?.record?.wins
+      );
 
-    const losses = numberValue(
-      mets.losses ??
-      mets.record?.losses ??
-      mets.team?.record?.losses
-    );
-
-    const recordElement =
-      document.getElementById("record");
-
-    const recordSubElement =
-      document.getElementById("record-sub");
+    const losses =
+      numberValue(
+        mets.losses ??
+        mets.record?.losses ??
+        mets.team?.record?.losses
+      );
 
     if (
       wins !== null &&
       losses !== null
     ) {
-      if (recordElement) {
-        recordElement.textContent =
+      const record =
+        document.getElementById(
+          "record"
+        );
+
+      const recordSub =
+        document.getElementById(
+          "record-sub"
+        );
+
+      if (record) {
+        record.textContent =
           `${wins}-${losses}`;
       }
 
-      const percentage =
-        wins + losses > 0
-          ? (wins / (wins + losses)).toFixed(3)
-          : "—";
+      if (recordSub) {
+        const pct =
+          wins + losses > 0
+            ? (
+                wins /
+                (wins + losses)
+              ).toFixed(3)
+            : "—";
 
-      if (recordSubElement) {
-        recordSubElement.textContent =
-          `Win % ${percentage}`;
+        recordSub.textContent =
+          `Win % ${pct}`;
       }
     }
 
@@ -446,11 +635,13 @@ async function loadStandings() {
       mets.rank ??
       mets.division?.rank;
 
-    const divisionRankElement =
-      document.getElementById("division-rank");
+    const divisionElement =
+      document.getElementById(
+        "division-rank"
+      );
 
-    if (divisionRankElement) {
-      divisionRankElement.textContent =
+    if (divisionElement) {
+      divisionElement.textContent =
         divisionRank
           ? `#${divisionRank}`
           : "—";
@@ -462,7 +653,9 @@ async function loadStandings() {
       mets.gamesBackInDivision;
 
     const gamesBackElement =
-      document.getElementById("games-back");
+      document.getElementById(
+        "games-back"
+      );
 
     if (gamesBackElement) {
       gamesBackElement.textContent =
@@ -474,144 +667,60 @@ async function loadStandings() {
           : `${gamesBack ?? "—"} GB`;
     }
 
-    let lastTen =
-      mets.lastTen ??
-      mets.last10 ??
-      mets.record?.lastTen ??
+    let lastTenText =
+      "—";
+
+    const lastTen =
+      mets.lastTen ||
+      mets.last10 ||
+      mets.record?.lastTen ||
       mets.record?.last10;
 
-    let lastTenText = "—";
-
-    if (typeof lastTen === "string") {
+    if (
+      typeof lastTen ===
+      "string"
+    ) {
       lastTenText =
-        lastTen.trim() || "—";
-    } else if (lastTen) {
-      const lastTenWins =
+        lastTen.trim() ||
+        "—";
+    } else if (
+      lastTen
+    ) {
+      const w =
         numberValue(
           lastTen.wins ??
-          lastTen.winsLastTen ??
           lastTen.w
         );
 
-      const lastTenLosses =
+      const l =
         numberValue(
           lastTen.losses ??
-          lastTen.lossesLastTen ??
           lastTen.l
         );
 
       if (
-        lastTenWins !== null &&
-        lastTenLosses !== null
+        w !== null &&
+        l !== null
       ) {
         lastTenText =
-          `${lastTenWins}-${lastTenLosses}`;
+          `${w}-${l}`;
       }
     }
 
-    /*
-      FALLBACK:
-      If standings doesn't provide Last 10,
-      calculate it from completed Mets games.
-    */
-
     if (
-      lastTenText === "—" ||
-      lastTenText === "0-0"
+      lastTenText ===
+        "—" ||
+      lastTenText ===
+        "0-0"
     ) {
-      try {
-        const today = getEasternDate();
-
-        const end = new Date(
-          `${today}T23:59:59`
-        );
-
-        const start = new Date(end);
-
-        start.setDate(
-          start.getDate() - 30
-        );
-
-        const startDate =
-          start.toISOString().split("T")[0];
-
-        const dataGames =
-          await api(
-            `/api/mets/games?startDate=${startDate}&endDate=${today}`
-          );
-
-        const games =
-          Array.isArray(dataGames?.games)
-            ? dataGames.games
-            : [];
-
-        const completed =
-          games
-            .filter(game => {
-              const state =
-                game?.status?.abstractGameState;
-
-              return (
-                state === "Final" ||
-                state === "Completed"
-              );
-            })
-            .sort(
-              (a, b) =>
-                new Date(b.gameDate) -
-                new Date(a.gameDate)
-            )
-            .slice(0, 10);
-
-        let wins10 = 0;
-        let losses10 = 0;
-
-        completed.forEach(game => {
-          const info =
-            getGameInfo(game);
-
-          const metsScore =
-            numberValue(
-              info.mets?.score
-            );
-
-          const opponentScore =
-            numberValue(
-              info.opponent?.score
-            );
-
-          if (
-            metsScore === null ||
-            opponentScore === null
-          ) {
-            return;
-          }
-
-          if (
-            metsScore > opponentScore
-          ) {
-            wins10++;
-          } else if (
-            metsScore < opponentScore
-          ) {
-            losses10++;
-          }
-        });
-
-        if (completed.length > 0) {
-          lastTenText =
-            `${wins10}-${losses10}`;
-        }
-      } catch (fallbackError) {
-        console.warn(
-          "Last 10 fallback failed:",
-          fallbackError
-        );
-      }
+      lastTenText =
+        await calculateLastTen();
     }
 
     const lastTenElement =
-      document.getElementById("last-ten");
+      document.getElementById(
+        "last-ten"
+      );
 
     if (lastTenElement) {
       lastTenElement.textContent =
@@ -624,20 +733,121 @@ async function loadStandings() {
       mets.streak;
 
     const streakElement =
-      document.getElementById("streak");
+      document.getElementById(
+        "streak"
+      );
 
     if (streakElement) {
       streakElement.textContent =
-        typeof streak === "string"
+        typeof streak ===
+        "string"
           ? streak
           : "—";
     }
-
   } catch (error) {
     console.error(
       "Standings:",
       error
     );
+  }
+}
+
+async function calculateLastTen() {
+  try {
+    const today =
+      getEasternDate();
+
+    const start =
+      new Date(
+        `${today}T12:00:00`
+      );
+
+    start.setDate(
+      start.getDate() - 30
+    );
+
+    const startDate =
+      start
+        .toISOString()
+        .split("T")[0];
+
+    const data =
+      await api(
+        `/api/mets/games?startDate=${startDate}&endDate=${today}`
+      );
+
+    const games =
+      Array.isArray(
+        data?.games
+      )
+        ? data.games
+        : [];
+
+    const completed =
+      games
+        .filter(
+          game =>
+            game?.status?.abstractGameState ===
+              "Final" ||
+            game?.status?.abstractGameState ===
+              "Completed"
+        )
+        .sort(
+          (a, b) =>
+            new Date(
+              b.gameDate
+            ) -
+            new Date(
+              a.gameDate
+            )
+        )
+        .slice(0, 10);
+
+    let wins = 0;
+    let losses = 0;
+
+    for (
+      const game of
+      completed
+    ) {
+      const info =
+        getGameInfo(
+          game
+        );
+
+      const metsScore =
+        numberValue(
+          info.mets?.score
+        );
+
+      const opponentScore =
+        numberValue(
+          info.opponent?.score
+        );
+
+      if (
+        metsScore === null ||
+        opponentScore === null
+      ) {
+        continue;
+      }
+
+      if (
+        metsScore >
+        opponentScore
+      ) {
+        wins++;
+      } else if (
+        metsScore <
+        opponentScore
+      ) {
+        losses++;
+      }
+    }
+
+    return `${wins}-${losses}`;
+  } catch {
+    return "—";
   }
 }
 
@@ -657,43 +867,59 @@ function getGameInfo(game) {
     {};
 
   const homeId =
-    getTeamId(home);
+    getTeamId(
+      home?.team ||
+      home
+    );
 
   const awayId =
-    getTeamId(away);
+    getTeamId(
+      away?.team ||
+      away
+    );
 
-  let metsIsHome = null;
+  let metsIsHome =
+    null;
 
-  if (homeId === METS_ID) {
+  if (
+    homeId === METS_ID
+  ) {
     metsIsHome = true;
   }
 
-  if (awayId === METS_ID) {
+  if (
+    awayId === METS_ID
+  ) {
     metsIsHome = false;
   }
 
-  /*
-    Some MLB responses put the team object
-    inside another nested team object.
-  */
+  const homeName =
+    getTeamName(
+      home?.team ||
+      home
+    ).toLowerCase();
 
-  if (metsIsHome === null) {
-    const homeName =
-      getTeamName(home).toLowerCase();
+  const awayName =
+    getTeamName(
+      away?.team ||
+      away
+    ).toLowerCase();
 
-    const awayName =
-      getTeamName(away).toLowerCase();
-
+  if (
+    metsIsHome === null
+  ) {
     if (
-      homeName.includes("mets") ||
-      homeName.includes("new york")
+      homeName.includes(
+        "mets"
+      )
     ) {
       metsIsHome = true;
     }
 
     if (
-      awayName.includes("mets") ||
-      awayName.includes("new york")
+      awayName.includes(
+        "mets"
+      )
     ) {
       metsIsHome = false;
     }
@@ -725,17 +951,16 @@ function renderGame(game) {
     metsIsHome,
     mets,
     opponent
-  } = getGameInfo(game);
+  } =
+    getGameInfo(
+      game
+    );
 
-  let opponentName =
-    getTeamName(opponent);
-
-  if (
-    opponentName === "Unknown Opponent"
-  ) {
-    opponentName =
-      getTeamName(opponent?.team);
-  }
+  const opponentName =
+    getTeamName(
+      opponent?.team ||
+      opponent
+    );
 
   const metsScore =
     numberValue(
@@ -760,23 +985,33 @@ function renderGame(game) {
     state === "Final" ||
     state === "Completed";
 
-  let resultClass = "";
+  let resultClass =
+    "";
 
   if (
     isFinal &&
     metsScore !== null &&
     opponentScore !== null
   ) {
-    if (metsScore > opponentScore) {
-      resultClass = "win";
+    if (
+      metsScore >
+      opponentScore
+    ) {
+      resultClass =
+        "win";
     }
 
-    if (metsScore < opponentScore) {
-      resultClass = "loss";
+    if (
+      metsScore <
+      opponentScore
+    ) {
+      resultClass =
+        "loss";
     }
   }
 
-  let scoreText = "—";
+  let scoreText =
+    "—";
 
   if (
     metsScore !== null &&
@@ -791,7 +1026,9 @@ function renderGame(game) {
     game?.status?.abstractGameState ||
     "Scheduled";
 
-  if (status === "Final") {
+  if (
+    isFinal
+  ) {
     status = "Final";
   }
 
@@ -802,14 +1039,25 @@ function renderGame(game) {
       ? "@"
       : "vs.";
 
+  const probablePitcher =
+    metsIsHome === true
+      ? game?.teams?.home?.probablePitcher?.fullName
+      : game?.teams?.away?.probablePitcher?.fullName;
+
   return `
     <div
       class="game"
-      data-game-state="${isFinal ? "completed" : "upcoming"}"
+      data-game-state="${
+        isFinal
+          ? "completed"
+          : "upcoming"
+      }"
     >
       <div class="game-date">
         ${escapeHTML(
-          formatDate(game?.gameDate)
+          formatDate(
+            game?.gameDate
+          )
         )}
       </div>
 
@@ -823,27 +1071,51 @@ function renderGame(game) {
         </span>
 
         <span class="team-name">
-          ${escapeHTML(opponentName)}
+          ${escapeHTML(
+            opponentName
+          )}
         </span>
 
-        <span class="game-score ${resultClass}">
-          ${escapeHTML(scoreText)}
+        <span
+          class="game-score ${resultClass}"
+        >
+          ${escapeHTML(
+            scoreText
+          )}
         </span>
       </div>
 
       <div class="game-status">
-        ${escapeHTML(status)}
+        ${escapeHTML(
+          status
+        )}
       </div>
+
+      ${
+        probablePitcher
+          ? `
+            <div class="game-pitcher">
+              Probable: ${escapeHTML(
+                probablePitcher
+              )}
+            </div>
+          `
+          : ""
+      }
     </div>
   `;
 }
 
 async function loadGames() {
   const container =
-    document.getElementById("games-list");
+    document.getElementById(
+      "games-list"
+    );
 
   const homeContainer =
-    document.getElementById("home-games");
+    document.getElementById(
+      "home-games"
+    );
 
   if (container) {
     container.innerHTML =
@@ -863,34 +1135,31 @@ async function loadGames() {
     const today =
       getEasternDate();
 
-    /*
-      Get enough history to support:
-      - recent results
-      - Last 10
-      - upcoming schedule
-    */
+    const start =
+      new Date(
+        `${today}T12:00:00`
+      );
 
-    const startDateObj =
-      new Date(`${today}T00:00:00`);
-
-    startDateObj.setDate(
-      startDateObj.getDate() - 14
+    start.setDate(
+      start.getDate() - 21
     );
 
-    const endDateObj =
-      new Date(`${today}T00:00:00`);
+    const end =
+      new Date(
+        `${today}T12:00:00`
+      );
 
-    endDateObj.setDate(
-      endDateObj.getDate() + 21
+    end.setDate(
+      end.getDate() + 30
     );
 
     const startDate =
-      startDateObj
+      start
         .toISOString()
         .split("T")[0];
 
     const endDate =
-      endDateObj
+      end
         .toISOString()
         .split("T")[0];
 
@@ -900,56 +1169,54 @@ async function loadGames() {
       );
 
     let games =
-      Array.isArray(data?.games)
+      Array.isArray(
+        data?.games
+      )
         ? data.games
         : [];
 
-    games = games.filter(game => {
-      if (!game?.gameDate) {
-        return false;
-      }
-
-      return (
-        new Date(game.gameDate) >=
-        startDateObj
-      );
-    });
-
     games.sort(
       (a, b) =>
-        new Date(a.gameDate) -
-        new Date(b.gameDate)
+        new Date(
+          a.gameDate
+        ) -
+        new Date(
+          b.gameDate
+        )
     );
 
-    if (!games.length) {
+    if (
+      !games.length
+    ) {
       const message =
         `<div class="loading">
           No Mets games found.
         </div>`;
 
       if (container) {
-        container.innerHTML = message;
+        container.innerHTML =
+          message;
       }
 
       if (homeContainer) {
-        homeContainer.innerHTML = message;
+        homeContainer.innerHTML =
+          message;
       }
 
       return;
     }
 
-    /*
-      Home page gets the next/recent five
-      most relevant games.
-    */
-
     const todayStart =
-      new Date(`${today}T00:00:00`);
+      new Date(
+        `${today}T00:00:00`
+      );
 
     const upcoming =
       games.filter(
         game =>
-          new Date(game.gameDate) >=
+          new Date(
+            game.gameDate
+          ) >=
           todayStart
       );
 
@@ -957,51 +1224,70 @@ async function loadGames() {
       games
         .filter(
           game =>
-            new Date(game.gameDate) <
+            new Date(
+              game.gameDate
+            ) <
             todayStart
         )
         .sort(
           (a, b) =>
-            new Date(b.gameDate) -
-            new Date(a.gameDate)
+            new Date(
+              b.gameDate
+            ) -
+            new Date(
+              a.gameDate
+            )
         );
 
     const homeGames = [
-      ...upcoming.slice(0, 5)
+      ...upcoming.slice(
+        0,
+        5
+      )
     ];
 
-    if (homeGames.length < 5) {
+    if (
+      homeGames.length <
+      5
+    ) {
       homeGames.push(
         ...recent.slice(
           0,
-          5 - homeGames.length
+          5 -
+            homeGames.length
         )
       );
     }
 
     homeGames.sort(
       (a, b) =>
-        new Date(a.gameDate) -
-        new Date(b.gameDate)
+        new Date(
+          a.gameDate
+        ) -
+        new Date(
+          b.gameDate
+        )
     );
 
     if (container) {
       container.innerHTML =
         games
-          .map(renderGame)
+          .map(
+            renderGame
+          )
           .join("");
     }
 
     if (homeContainer) {
       homeContainer.innerHTML =
         homeGames
-          .map(renderGame)
+          .map(
+            renderGame
+          )
           .join("");
     }
 
     applyGameFilter();
-    createStatOfDay(games);
-
   } catch (error) {
     console.error(
       "Games:",
@@ -1011,14 +1297,20 @@ async function loadGames() {
     const message =
       `<div class="error-box">
         Unable to load Mets games right now.
+        <br>
+        <small>${escapeHTML(
+          error.message
+        )}</small>
       </div>`;
 
     if (container) {
-      container.innerHTML = message;
+      container.innerHTML =
+        message;
     }
 
     if (homeContainer) {
-      homeContainer.innerHTML = message;
+      homeContainer.innerHTML =
+        message;
     }
   }
 }
@@ -1029,19 +1321,23 @@ async function loadGames() {
 
 function applyGameFilter() {
   document
-    .querySelectorAll("#games-list .game")
+    .querySelectorAll(
+      "#games-list .game"
+    )
     .forEach(game => {
       const state =
         game.dataset.gameState;
 
-      let visible = true;
+      let visible =
+        true;
 
       if (
         currentGameFilter ===
         "completed"
       ) {
         visible =
-          state === "completed";
+          state ===
+          "completed";
       }
 
       if (
@@ -1049,7 +1345,8 @@ function applyGameFilter() {
         "upcoming"
       ) {
         visible =
-          state === "upcoming";
+          state ===
+          "upcoming";
       }
 
       game.style.display =
@@ -1084,7 +1381,9 @@ document.addEventListener(
         );
       });
 
-    button.classList.add("active");
+    button.classList.add(
+      "active"
+    );
 
     applyGameFilter();
   }
@@ -1094,28 +1393,41 @@ document.addEventListener(
 // ROSTER
 // ============================================================
 
-function rosterCategory(player) {
-  if (isPitcher(player)) {
+function rosterCategory(
+  player
+) {
+  if (
+    isPitcher(player)
+  ) {
     return "pitchers";
   }
 
-  if (isInfield(player)) {
+  if (
+    isInfield(player)
+  ) {
     return "infield";
   }
 
-  if (isOutfield(player)) {
+  if (
+    isOutfield(player)
+  ) {
     return "outfield";
   }
 
   return "infield";
 }
 
-function renderRosterPlayer(player) {
+function renderRosterPlayer(
+  player
+) {
   const person =
-    player?.person || player;
+    player?.person ||
+    player;
 
   const playerId =
-    getPlayerId(player);
+    getPlayerId(
+      player
+    );
 
   const number =
     player?.jerseyNumber ||
@@ -1131,27 +1443,36 @@ function renderRosterPlayer(player) {
   return `
     <div
       class="player-card"
-      data-player-id="${escapeHTML(playerId)}"
-      data-player-name="${escapeHTML(
-        getPlayerName(player).toLowerCase()
+      data-player-id="${escapeHTML(
+        playerId
       )}"
     >
       <div class="player-top">
         <div class="player-number">
-          ${escapeHTML(number)}
+          ${escapeHTML(
+            number
+          )}
         </div>
 
         <div>
           <div class="player-name">
             ${escapeHTML(
-              getPlayerName(player)
+              getPlayerName(
+                player
+              )
             )}
           </div>
 
           <div class="player-position">
-            ${escapeHTML(position)}
+            ${escapeHTML(
+              position
+            )}
           </div>
         </div>
+      </div>
+
+      <div class="player-card-arrow">
+        →
       </div>
     </div>
   `;
@@ -1161,19 +1482,25 @@ function renderRosterSection(
   title,
   players
 ) {
-  if (!players.length) {
+  if (
+    !players.length
+  ) {
     return "";
   }
 
   return `
     <div class="roster-group">
       <h2 class="roster-group-title">
-        ${escapeHTML(title)}
+        ${escapeHTML(
+          title
+        )}
       </h2>
 
       <div class="roster-grid-section">
         ${players
-          .map(renderRosterPlayer)
+          .map(
+            renderRosterPlayer
+          )
           .join("")}
       </div>
     </div>
@@ -1202,42 +1529,52 @@ async function loadRoster() {
       );
 
     let roster =
-      Array.isArray(data?.roster)
+      Array.isArray(
+        data?.roster
+      )
         ? data.roster
         : [];
-
-    /*
-      Remove obvious duplicates.
-    */
 
     const seen =
       new Set();
 
     roster =
-      roster.filter(player => {
-        const id =
-          getPlayerId(player);
+      roster.filter(
+        player => {
+          const id =
+            getPlayerId(
+              player
+            );
 
-        const name =
-          getPlayerName(player);
+          const name =
+            getPlayerName(
+              player
+            );
 
-        const key =
-          id || name;
+          const key =
+            id ||
+            name;
 
-        if (seen.has(key)) {
-          return false;
+          if (
+            seen.has(
+              key
+            )
+          ) {
+            return false;
+          }
+
+          seen.add(
+            key
+          );
+
+          return true;
         }
-
-        seen.add(key);
-
-        return true;
-      });
+      );
 
     allRosterPlayers =
       roster;
 
     renderRoster();
-
   } catch (error) {
     console.error(
       "Roster:",
@@ -1247,6 +1584,10 @@ async function loadRoster() {
     container.innerHTML =
       `<div class="error-box">
         Unable to load active Mets roster.
+        <br>
+        <small>${escapeHTML(
+          error.message
+        )}</small>
       </div>`;
   }
 }
@@ -1278,30 +1619,40 @@ function renderRoster() {
           return true;
         }
 
-        return getPlayerName(player)
+        return getPlayerName(
+          player
+        )
           .toLowerCase()
-          .includes(search);
+          .includes(
+            search
+          );
       }
     );
 
   const pitchers =
     roster.filter(
-      player =>
-        rosterCategory(player) ===
+      p =>
+        rosterCategory(
+          p
+        ) ===
         "pitchers"
     );
 
   const infield =
     roster.filter(
-      player =>
-        rosterCategory(player) ===
+      p =>
+        rosterCategory(
+          p
+        ) ===
         "infield"
     );
 
   const outfield =
     roster.filter(
-      player =>
-        rosterCategory(player) ===
+      p =>
+        rosterCategory(
+          p
+        ) ===
         "outfield"
     );
 
@@ -1319,7 +1670,9 @@ function renderRoster() {
       outfield
     );
 
-  if (!container.innerHTML.trim()) {
+  if (
+    !container.innerHTML.trim()
+  ) {
     container.innerHTML =
       `<div class="loading">
         No players match your search.
@@ -1335,6 +1688,20 @@ document.addEventListener(
       "roster-search"
     ) {
       renderRoster();
+    }
+
+    if (
+      event.target.id ===
+      "stats-search"
+    ) {
+      renderStats();
+    }
+
+    if (
+      event.target.id ===
+      "prospect-search"
+    ) {
+      renderProspects();
     }
   }
 );
@@ -1355,7 +1722,9 @@ document.addEventListener(
       card.dataset.playerId;
 
     if (id) {
-      openPlayer(id);
+      openPlayer(
+        id
+      );
     }
   }
 );
@@ -1364,23 +1733,39 @@ document.addEventListener(
 // STATS
 // ============================================================
 
-function extractStatArray(data) {
-  if (Array.isArray(data?.stats)) {
+function extractStatArray(
+  data
+) {
+  if (
+    Array.isArray(
+      data?.stats
+    )
+  ) {
     return data.stats;
   }
 
-  if (Array.isArray(data?.splits)) {
+  if (
+    Array.isArray(
+      data?.splits
+    )
+  ) {
     return data.splits;
   }
 
-  if (Array.isArray(data)) {
+  if (
+    Array.isArray(
+      data
+    )
+  ) {
     return data;
   }
 
   return [];
 }
 
-function getStatObject(split) {
+function getStatObject(
+  split
+) {
   return (
     split?.stat ||
     split?.stats ||
@@ -1389,7 +1774,9 @@ function getStatObject(split) {
   );
 }
 
-function getStatPlayer(split) {
+function getStatPlayer(
+  split
+) {
   return (
     split?.player ||
     split?.person ||
@@ -1398,67 +1785,18 @@ function getStatPlayer(split) {
   );
 }
 
-function isFormerPlayer(split) {
-  /*
-    Prefer explicit API information.
-  */
-
-  if (
-    split?.isFormer === true ||
-    split?.former === true ||
-    split?.active === false
-  ) {
-    return true;
-  }
-
-  const team =
-    split?.team ||
-    split?.teamInfo;
-
-  if (
-    team &&
-    Number(team.id) &&
-    Number(team.id) !== METS_ID
-  ) {
-    return true;
-  }
-
-  /*
-    If stats endpoint only returns current
-    Mets players, this defaults to Active.
-  */
-
-  return false;
-}
-
-function statNumber(
-  stat,
-  keys
+function prepareStatRecord(
+  split
 ) {
-  for (const key of keys) {
-    if (
-      stat?.[key] !== undefined &&
-      stat?.[key] !== null &&
-      stat?.[key] !== ""
-    ) {
-      const number =
-        Number(stat[key]);
-
-      if (Number.isFinite(number)) {
-        return number;
-      }
-    }
-  }
-
-  return null;
-}
-
-function prepareStatRecord(split) {
   const stat =
-    getStatObject(split);
+    getStatObject(
+      split
+    );
 
   const player =
-    getStatPlayer(split);
+    getStatPlayer(
+      split
+    );
 
   const name =
     getPlayerName({
@@ -1482,52 +1820,38 @@ function prepareStatRecord(split) {
     name,
 
     active:
-      !isFormerPlayer(split),
+      split?.active === true ||
+      split?.isActive === true,
 
     G:
-      statNumber(
-        stat,
-        [
-          "gamesPlayed",
-          "games",
-          "G"
-        ]
+      numberValue(
+        stat.gamesPlayed ??
+        stat.gamesPitched ??
+        stat.games
       ),
 
     AB:
-      statNumber(
-        stat,
-        [
-          "atBats",
-          "AB"
-        ]
+      numberValue(
+        stat.atBats ??
+        stat.AB
       ),
 
     H:
-      statNumber(
-        stat,
-        [
-          "hits",
-          "H"
-        ]
+      numberValue(
+        stat.hits ??
+        stat.H
       ),
 
     HR:
-      statNumber(
-        stat,
-        [
-          "homeRuns",
-          "HR"
-        ]
+      numberValue(
+        stat.homeRuns ??
+        stat.HR
       ),
 
     RBI:
-      statNumber(
-        stat,
-        [
-          "rbi",
-          "RBI"
-        ]
+      numberValue(
+        stat.rbi ??
+        stat.RBI
       ),
 
     AVG:
@@ -1555,93 +1879,48 @@ function prepareStatRecord(split) {
       ),
 
     IP:
-      statNumber(
-        stat,
-        [
-          "inningsPitched",
-          "IP"
-        ]
-      ),
+      stat.inningsPitched ??
+      stat.IP ??
+      null,
 
     W:
-      statNumber(
-        stat,
-        [
-          "wins",
-          "W"
-        ]
+      numberValue(
+        stat.wins ??
+        stat.W
       ),
 
     L:
-      statNumber(
-        stat,
-        [
-          "losses",
-          "L"
-        ]
+      numberValue(
+        stat.losses ??
+        stat.L
       ),
 
     ERA:
-      statNumber(
-        stat,
-        [
-          "era",
-          "ERA"
-        ]
+      numberValue(
+        stat.era ??
+        stat.ERA
       ),
 
     WHIP:
-      statNumber(
-        stat,
-        [
-          "whip",
-          "WHIP"
-        ]
+      numberValue(
+        stat.whip ??
+        stat.WHIP
       ),
 
     SO:
-      statNumber(
-        stat,
-        [
-          "strikeOuts",
-          "strikeouts",
-          "SO"
-        ]
+      numberValue(
+        stat.strikeOuts ??
+        stat.strikeouts ??
+        stat.SO
       ),
 
     BB:
-      statNumber(
-        stat,
-        [
-          "baseOnBalls",
-          "walks",
-          "BB"
-        ]
+      numberValue(
+        stat.baseOnBalls ??
+        stat.walks ??
+        stat.BB
       )
   };
-}
-
-function formatStat(
-  value,
-  decimals = 0
-) {
-  if (
-    value === null ||
-    value === undefined ||
-    Number.isNaN(value)
-  ) {
-    return "—";
-  }
-
-  if (decimals === 0) {
-    return String(
-      Math.round(value)
-    );
-  }
-
-  return Number(value)
-    .toFixed(decimals)
-    .replace(/^0\./, ".");
 }
 
 function renderStatsTable(
@@ -1649,11 +1928,15 @@ function renderStatsTable(
   type,
   title
 ) {
-  if (!records.length) {
+  if (
+    !records.length
+  ) {
     return `
       <div class="stats-block">
         <div class="stats-block-title">
-          ${escapeHTML(title)}
+          ${escapeHTML(
+            title
+          )}
         </div>
 
         <div class="loading">
@@ -1664,7 +1947,8 @@ function renderStatsTable(
   }
 
   const isHitting =
-    type === "hitting";
+    type ===
+    "hitting";
 
   const columns =
     isHitting
@@ -1694,8 +1978,8 @@ function renderStatsTable(
 
   const rows =
     records
-      .map(record => {
-        return `
+      .map(
+        record => `
           <tr>
             <td>
               ${
@@ -1719,117 +2003,136 @@ function renderStatsTable(
 
               ${
                 record.active
-                  ? `<span class="active-badge">ACTIVE</span>`
-                  : ""
+                  ? `
+                    <span class="active-badge">
+                      ACTIVE
+                    </span>
+                  `
+                  : `
+                    <span class="former-badge">
+                      FORMER
+                    </span>
+                  `
               }
             </td>
 
             ${columns
               .slice(1)
-              .map(([key]) => {
-                let value =
-                  record[key];
-
-                if (
-                  [
-                    "AVG",
-                    "OBP",
-                    "SLG",
-                    "OPS"
-                  ].includes(key)
-                ) {
-                  value =
-                    formatStat(
-                      value,
-                      3
-                    );
-                } else if (
-                  key === "ERA" ||
-                  key === "WHIP"
-                ) {
-                  value =
-                    formatStat(
-                      value,
-                      2
-                    );
-                } else if (
-                  key === "IP"
-                ) {
-                  value =
-                    value === null
-                      ? "—"
-                      : String(value);
-                } else {
-                  value =
-                    formatStat(
-                      value,
-                      0
-                    );
-                }
-
-                return `
-                  <td>
-                    ${escapeHTML(value)}
-                  </td>
-                `;
-              })
-              .join("")}
-          </tr>
-        `;
-      })
-      .join("");
-
-  return `
-    <div class="stats-block">
-      <div class="stats-block-title">
-        ${escapeHTML(title)}
-      </div>
-
-      <table class="stats-table">
-        <thead>
-          <tr>
-            ${columns
               .map(
-                ([key, label]) => {
-                  const active =
-                    currentSort.key ===
-                    key;
+                ([key]) => {
+                  let value =
+                    record[
+                      key
+                    ];
 
-                  const arrow =
-                    active
-                      ? (
-                          currentSort.direction ===
-                          "asc"
-                            ? "↑"
-                            : "↓"
-                        )
-                      : "";
+                  if (
+                    [
+                      "AVG",
+                      "OBP",
+                      "SLG",
+                      "OPS"
+                    ].includes(
+                      key
+                    )
+                  ) {
+                    value =
+                      formatStat(
+                        value,
+                        3
+                      );
+                  } else if (
+                    key ===
+                      "ERA" ||
+                    key ===
+                      "WHIP"
+                  ) {
+                    value =
+                      formatStat(
+                        value,
+                        2
+                      );
+                  } else {
+                    value =
+                      formatStat(
+                        value,
+                        0
+                      );
+                  }
 
                   return `
-                    <th
-                      data-sort-key="${escapeHTML(
-                        key
-                      )}"
-                    >
-                      ${escapeHTML(label)}
-
-                      ${
-                        arrow
-                          ? `<span class="sort-arrow">${arrow}</span>`
-                          : ""
-                      }
-                    </th>
+                    <td>
+                      ${escapeHTML(
+                        value
+                      )}
+                    </td>
                   `;
                 }
               )
               .join("")}
           </tr>
-        </thead>
+        `
+      )
+      .join("");
 
-        <tbody>
-          ${rows}
-        </tbody>
-      </table>
+  return `
+    <div class="stats-block">
+      <div class="stats-block-title">
+        ${escapeHTML(
+          title
+        )}
+      </div>
+
+      <div class="table-scroll">
+        <table class="stats-table">
+          <thead>
+            <tr>
+              ${columns
+                .map(
+                  ([key, label]) => {
+                    const active =
+                      currentSort.key ===
+                      key;
+
+                    const arrow =
+                      active
+                        ? currentSort.direction ===
+                          "asc"
+                          ? "↑"
+                          : "↓"
+                        : "";
+
+                    return `
+                      <th
+                        data-sort-key="${escapeHTML(
+                          key
+                        )}"
+                      >
+                        ${escapeHTML(
+                          label
+                        )}
+
+                        ${
+                          arrow
+                            ? `
+                              <span class="sort-arrow">
+                                ${arrow}
+                              </span>
+                            `
+                            : ""
+                        }
+                      </th>
+                    `;
+                  }
+                )
+                .join("")}
+            </tr>
+          </thead>
+
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 }
@@ -1855,40 +2158,57 @@ function renderStats() {
       .toLowerCase();
 
   let records =
-    allStats.filter(record => {
-      if (!search) {
-        return true;
+    allStats.filter(
+      record => {
+        if (!search) {
+          return true;
+        }
+
+        return record.name
+          .toLowerCase()
+          .includes(
+            search
+          );
       }
+    );
 
-      return record.name
-        .toLowerCase()
-        .includes(search);
-    });
-
-  if (currentSort.key) {
+  if (
+    currentSort.key
+  ) {
     const key =
       currentSort.key;
 
     records.sort(
       (a, b) => {
-        if (key === "name") {
+        if (
+          key ===
+          "name"
+        ) {
           return currentSort.direction ===
             "asc"
-            ? a.name.localeCompare(b.name)
-            : b.name.localeCompare(a.name);
+            ? a.name.localeCompare(
+                b.name
+              )
+            : b.name.localeCompare(
+                a.name
+              );
         }
 
         const av =
           a[key] === null ||
           a[key] === undefined
             ? -Infinity
-            : Number(a[key]);
+            : Number(
+                a[key]
+              );
 
         const bv =
           b[key] === null ||
           b[key] === undefined
             ? -Infinity
-            : Number(b[key]);
+            : Number(
+                b[key]
+              );
 
         return currentSort.direction ===
           "asc"
@@ -1896,14 +2216,7 @@ function renderStats() {
           : bv - av;
       }
     );
-  }
-
-  /*
-    Put active players before former players
-    when there is no explicit numeric sort.
-  */
-
-  if (!currentSort.key) {
+  } else {
     records.sort(
       (a, b) => {
         if (
@@ -1924,14 +2237,14 @@ function renderStats() {
 
   const active =
     records.filter(
-      record =>
-        record.active
+      r =>
+        r.active
     );
 
   const former =
     records.filter(
-      record =>
-        !record.active
+      r =>
+        !r.active
     );
 
   container.innerHTML =
@@ -1965,24 +2278,52 @@ async function loadStats() {
   try {
     const data =
       await api(
-        `/api/mets/stats?season=${CURRENT_SEASON}&group=${encodeURIComponent(
-          currentStatMode
-        )}`
+        `/api/mets/stats?season=${CURRENT_SEASON}&group=${currentStatMode}`
       );
 
     const splits =
-      extractStatArray(data);
+      extractStatArray(
+        data
+      );
 
     allStats =
       splits
-        .map(prepareStatRecord)
+        .map(
+          prepareStatRecord
+        )
         .filter(
           record =>
             record.name !==
             "Unknown Player"
         );
 
-    if (!allStats.length) {
+    const activeIds =
+      new Set(
+        (
+          data?.activePlayerIds ||
+          []
+        ).map(
+          String
+        )
+      );
+
+    allStats =
+      allStats.map(
+        record => ({
+          ...record,
+
+          active:
+            activeIds.has(
+              String(
+                record.id
+              )
+            )
+        })
+      );
+
+    if (
+      !allStats.length
+    ) {
       container.innerHTML =
         `<div class="loading">
           No Mets player statistics found.
@@ -1999,7 +2340,6 @@ async function loadStats() {
     renderStats();
 
     createStatOfDayFromStats();
-
   } catch (error) {
     console.error(
       "Stats:",
@@ -2009,12 +2349,16 @@ async function loadStats() {
     container.innerHTML =
       `<div class="error-box">
         Unable to load Mets statistics.
+        <br>
+        <small>${escapeHTML(
+          error.message
+        )}</small>
       </div>`;
   }
 }
 
 // ============================================================
-// STAT MODE / SORTING
+// STAT MODE / SORT
 // ============================================================
 
 document.addEventListener(
@@ -2033,11 +2377,12 @@ document.addEventListener(
         .querySelectorAll(
           ".stats-mode-button"
         )
-        .forEach(button => {
-          button.classList.remove(
-            "active"
-          );
-        });
+        .forEach(
+          button =>
+            button.classList.remove(
+              "active"
+            )
+        );
 
       modeButton.classList.add(
         "active"
@@ -2089,20 +2434,10 @@ document.addEventListener(
         playerButton.dataset.playerId;
 
       if (id) {
-        openPlayer(id);
+        openPlayer(
+          id
+        );
       }
-    }
-  }
-);
-
-document.addEventListener(
-  "input",
-  event => {
-    if (
-      event.target.id ===
-      "stats-search"
-    ) {
-      renderStats();
     }
   }
 );
@@ -2124,7 +2459,10 @@ async function openPlayer(
       "player-details"
     );
 
-  if (!modal || !details) {
+  if (
+    !modal ||
+    !details
+  ) {
     return;
   }
 
@@ -2145,142 +2483,104 @@ async function openPlayer(
         )}`
       );
 
-    let statsData;
-
-    try {
-      statsData =
-        await api(
-          `/api/player/${encodeURIComponent(
-            playerId
-          )}/stats?season=${CURRENT_SEASON}&group=hitting`
-        );
-    } catch {
-      statsData = {
-        stats: []
-      };
-    }
+    const statsData =
+      await api(
+        `/api/player/${encodeURIComponent(
+          playerId
+        )}/stats?season=${CURRENT_SEASON}&group=hitting`
+      );
 
     const player =
       playerData?.player ||
       playerData;
 
     const split =
-      statsData?.stats?.[0]?.splits?.[0] ||
-      statsData?.splits?.[0] ||
+      statsData?.stats?.[0] ||
       {};
 
     const stat =
       split?.stat ||
       {};
 
-    details.innerHTML = `
-      <div class="player-modal-name">
-        ${escapeHTML(
-          player?.fullName ||
-          player?.name ||
-          "Unknown Player"
-        )}
-      </div>
+    const headshot =
+      player?.id
+        ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_300,q_auto:good,f_auto/v1/people/${player.id}/headshot/silo/current`
+        : "";
 
-      <div class="player-modal-info">
-        ${escapeHTML(
-          player?.primaryPosition?.name ||
-          player?.position?.name ||
-          "—"
-        )}
+    details.innerHTML = `
+      <div class="player-profile">
 
         ${
-          player?.primaryNumber
-            ? ` · #${escapeHTML(
-                player.primaryNumber
-              )}`
+          headshot
+            ? `
+              <img
+                class="player-headshot"
+                src="${headshot}"
+                alt=""
+                onerror="this.style.display='none'"
+              >
+            `
             : ""
         }
+
+        <div>
+          <div class="player-modal-name">
+            ${escapeHTML(
+              player?.fullName ||
+              "Unknown Player"
+            )}
+          </div>
+
+          <div class="player-modal-info">
+            ${escapeHTML(
+              player?.primaryPosition?.name ||
+              "—"
+            )}
+
+            ${
+              player?.primaryNumber
+                ? ` · #${escapeHTML(
+                    player.primaryNumber
+                  )}`
+                : ""
+            }
+          </div>
+        </div>
       </div>
 
       <div class="player-stat-grid">
 
-        <div class="player-stat">
-          <div class="player-stat-label">
-            AVG
-          </div>
+        ${playerStatCard(
+          "AVG",
+          stat.avg
+        )}
 
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.avg ??
-              "—"
-            )}
-          </div>
-        </div>
+        ${playerStatCard(
+          "HR",
+          stat.homeRuns
+        )}
 
-        <div class="player-stat">
-          <div class="player-stat-label">
-            HR
-          </div>
+        ${playerStatCard(
+          "RBI",
+          stat.rbi
+        )}
 
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.homeRuns ??
-              "—"
-            )}
-          </div>
-        </div>
+        ${playerStatCard(
+          "OPS",
+          stat.ops
+        )}
 
-        <div class="player-stat">
-          <div class="player-stat-label">
-            RBI
-          </div>
+        ${playerStatCard(
+          "OBP",
+          stat.obp
+        )}
 
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.rbi ??
-              "—"
-            )}
-          </div>
-        </div>
-
-        <div class="player-stat">
-          <div class="player-stat-label">
-            OPS
-          </div>
-
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.ops ??
-              "—"
-            )}
-          </div>
-        </div>
-
-        <div class="player-stat">
-          <div class="player-stat-label">
-            OBP
-          </div>
-
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.obp ??
-              "—"
-            )}
-          </div>
-        </div>
-
-        <div class="player-stat">
-          <div class="player-stat-label">
-            SLG
-          </div>
-
-          <div class="player-stat-value">
-            ${escapeHTML(
-              stat.slg ??
-              "—"
-            )}
-          </div>
-        </div>
-
+        ${playerStatCard(
+          "SLG",
+          stat.slg
+        )}
       </div>
     `;
-
   } catch (error) {
     console.error(
       "Player:",
@@ -2290,8 +2590,34 @@ async function openPlayer(
     details.innerHTML =
       `<div class="error-box">
         Unable to load player information.
+        <br>
+        <small>${escapeHTML(
+          error.message
+        )}</small>
       </div>`;
   }
+}
+
+function playerStatCard(
+  label,
+  value
+) {
+  return `
+    <div class="player-stat">
+      <div class="player-stat-label">
+        ${escapeHTML(
+          label
+        )}
+      </div>
+
+      <div class="player-stat-value">
+        ${escapeHTML(
+          value ??
+          "—"
+        )}
+      </div>
+    </div>
+  `;
 }
 
 function closePlayerModal() {
@@ -2366,7 +2692,9 @@ async function loadTransactions() {
         ? data.transactions
         : [];
 
-    if (!transactions.length) {
+    if (
+      !transactions.length
+    ) {
       container.innerHTML =
         `<div class="loading">
           No recent transactions found.
@@ -2377,49 +2705,48 @@ async function loadTransactions() {
 
     container.innerHTML =
       transactions
-        .map(transaction => {
-          const playerName =
-            getPlayerName(
-              transaction
-            );
+        .map(
+          transaction => {
+            const playerName =
+              getPlayerName(
+                transaction
+              );
 
-          const finalName =
-            playerName ===
-            "Unknown Player"
-              ? "Team transaction"
-              : playerName;
+            const finalName =
+              playerName ===
+              "Unknown Player"
+                ? "Team transaction"
+                : playerName;
 
-          return `
-            <div class="transaction">
+            return `
+              <div class="transaction">
+                <div class="transaction-date">
+                  ${escapeHTML(
+                    formatDate(
+                      transaction.date
+                    )
+                  )}
+                </div>
 
-              <div class="transaction-date">
-                ${escapeHTML(
-                  formatDate(
-                    transaction.date
-                  )
-                )}
+                <div class="transaction-player">
+                  ${escapeHTML(
+                    finalName
+                  )}
+                </div>
+
+                <div class="transaction-type">
+                  ${escapeHTML(
+                    transaction.description ||
+                    transaction.typeDesc ||
+                    transaction.type ||
+                    "Transaction"
+                  )}
+                </div>
               </div>
-
-              <div class="transaction-player">
-                ${escapeHTML(
-                  finalName
-                )}
-              </div>
-
-              <div class="transaction-type">
-                ${escapeHTML(
-                  transaction.description ||
-                  transaction.typeDesc ||
-                  transaction.type ||
-                  "Transaction"
-                )}
-              </div>
-
-            </div>
-          `;
-        })
+            `;
+          }
+        )
         .join("");
-
   } catch (error) {
     console.error(
       "Transactions:",
@@ -2429,7 +2756,354 @@ async function loadTransactions() {
     container.innerHTML =
       `<div class="error-box">
         Unable to load Mets transactions.
+        <br>
+        <small>${escapeHTML(
+          error.message
+        )}</small>
       </div>`;
+  }
+}
+
+// ============================================================
+// PROSPECT CENTER
+// ============================================================
+
+async function loadProspects() {
+  const container =
+    document.getElementById(
+      "prospect-grid"
+    );
+
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML =
+    `<div class="loading">
+      Loading Mets minor-league players...
+    </div>`;
+
+  try {
+    const data =
+      await api(
+        "/api/mets/prospects"
+      );
+
+    allProspects =
+      Array.isArray(
+        data?.prospects
+      )
+        ? data.prospects
+        : [];
+
+    renderProspects();
+
+    updateProspectTeamFilter(
+      data?.teams ||
+      []
+    );
+  } catch (error) {
+    console.error(
+      "Prospects:",
+      error
+    );
+
+    container.innerHTML =
+      `<div class="error-box">
+        Unable to load the Mets prospect database.
+        <br>
+        <small>${escapeHTML(
+          error.message
+        )}</small>
+      </div>`;
+  }
+}
+
+function updateProspectTeamFilter(
+  teams
+) {
+  const select =
+    document.getElementById(
+      "prospect-level"
+    );
+
+  if (!select) {
+    return;
+  }
+
+  const current =
+    select.value;
+
+  const values =
+    [
+      ...new Map(
+        teams.map(
+          team => [
+            String(
+              team.id
+            ),
+            team.name
+          ]
+        )
+      )
+    ];
+
+  select.innerHTML =
+    `
+      <option value="all">
+        All Levels
+      </option>
+    ` +
+    values
+      .map(
+        ([id, name]) =>
+          `
+            <option value="${escapeHTML(
+              id
+            )}">
+              ${escapeHTML(
+                name
+              )}
+            </option>
+          `
+      )
+      .join("");
+
+  if (
+    [
+      "all",
+      ...values.map(
+        ([id]) => id
+      )
+    ].includes(
+      current
+    )
+  ) {
+    select.value =
+      current;
+  }
+}
+
+function renderProspects() {
+  const container =
+    document.getElementById(
+      "prospect-grid"
+    );
+
+  if (!container) {
+    return;
+  }
+
+  const search =
+    (
+      document.getElementById(
+        "prospect-search"
+      )?.value ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const level =
+    document.getElementById(
+      "prospect-level"
+    )?.value ||
+    "all";
+
+  const position =
+    document.getElementById(
+      "prospect-position"
+    )?.value ||
+    "all";
+
+  const filtered =
+    allProspects.filter(
+      player => {
+        const matchesSearch =
+          !search ||
+          player.name
+            .toLowerCase()
+            .includes(
+              search
+            );
+
+        const matchesLevel =
+          level ===
+            "all" ||
+          String(
+            player.teamId
+          ) ===
+            String(level);
+
+        const playerPosition =
+          String(
+            player.position ||
+            ""
+          ).toLowerCase();
+
+        const matchesPosition =
+          position ===
+            "all" ||
+          (
+            position ===
+              "pitcher"
+              ? playerPosition ===
+                  "p" ||
+                playerPosition.includes(
+                  "pitch"
+                )
+              : position ===
+                "catcher"
+              ? playerPosition ===
+                  "c" ||
+                playerPosition.includes(
+                  "catch"
+                )
+              : position ===
+                "infield"
+              ? [
+                  "1b",
+                  "2b",
+                  "3b",
+                  "ss"
+                ].includes(
+                  playerPosition
+                )
+              : position ===
+                "outfield"
+              ? [
+                  "lf",
+                  "cf",
+                  "rf",
+                  "of"
+                ].includes(
+                  playerPosition
+                )
+              : true
+          );
+
+        return (
+          matchesSearch &&
+          matchesLevel &&
+          matchesPosition
+        );
+      }
+    );
+
+  if (
+    !filtered.length
+  ) {
+    container.innerHTML =
+      `<div class="loading">
+        No prospects match your filters.
+      </div>`;
+
+    return;
+  }
+
+  container.innerHTML =
+    filtered
+      .map(
+        player => `
+          <button
+            class="prospect-card"
+            data-prospect-id="${escapeHTML(
+              player.id
+            )}"
+          >
+            <div class="prospect-card-top">
+              <div class="prospect-avatar">
+                ${escapeHTML(
+                  player.name
+                    .charAt(0)
+                    .toUpperCase()
+                )}
+              </div>
+
+              <div>
+                <h3>
+                  ${escapeHTML(
+                    player.name
+                  )}
+                </h3>
+
+                <span>
+                  ${escapeHTML(
+                    player.position
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div class="prospect-meta">
+              <span>
+                ${escapeHTML(
+                  player.teamName
+                )}
+              </span>
+
+              <span>
+                #${escapeHTML(
+                  player.jerseyNumber
+                )}
+              </span>
+            </div>
+
+            <div class="prospect-arrow">
+              View Player →
+            </div>
+          </button>
+        `
+      )
+      .join("");
+}
+
+document.addEventListener(
+  "change",
+  event => {
+    if (
+      event.target.id ===
+        "prospect-level" ||
+      event.target.id ===
+        "prospect-position"
+    ) {
+      renderProspects();
+    }
+  }
+);
+
+document.addEventListener(
+  "click",
+  event => {
+    const card =
+      event.target.closest(
+        ".prospect-card"
+      );
+
+    if (!card) {
+      return;
+    }
+
+    const id =
+      card.dataset.prospectId;
+
+    if (id) {
+      openProspect(
+        id
+      );
+    }
+  }
+);
+
+async function openProspect(
+  id
+) {
+  try {
+    await openPlayer(
+      id
+    );
+  } catch {
+    // openPlayer handles errors.
   }
 }
 
@@ -2447,22 +3121,53 @@ function createStatOfDayFromStats() {
     return;
   }
 
-  if (!allStats.length) {
+  if (
+    !allStats.length
+  ) {
     return;
   }
 
   /*
-    Only use hitting records for the
-    home-page HR stat.
+    IMPORTANT:
+    Only use hitting data when determining
+    a home-run stat.
+
+    This prevents the old bug where a pitcher
+    could accidentally become the "HR leader."
   */
+
+  if (
+    currentStatMode !==
+    "hitting"
+  ) {
+    element.innerHTML = `
+      <div class="stat-big">
+        ⚾
+      </div>
+
+      <h3>
+        Mets pitching spotlight
+      </h3>
+
+      <p>
+        Switch to hitting to see the
+        verified home-run leader.
+      </p>
+    `;
+
+    return;
+  }
 
   const hitters =
     allStats.filter(
       player =>
-        player.HR !== null
+        player.HR !== null &&
+        player.active
     );
 
-  if (!hitters.length) {
+  if (
+    !hitters.length
+  ) {
     return;
   }
 
@@ -2484,51 +3189,27 @@ function createStatOfDayFromStats() {
       )}
     </h3>
 
-    <p>
-      Leads the available Mets hitting
-      data with ${escapeHTML(
+    <div class="stat-feature-number">
+      ${escapeHTML(
         leader.HR
-      )} home runs.
+      )}
+    </div>
+
+    <p>
+      Home runs in the
+      ${CURRENT_SEASON}
+      season.
     </p>
   `;
-}
-
-function createStatOfDay(games) {
-  if (!games?.length) {
-    return;
-  }
-
-  const element =
-    document.getElementById(
-      "stat-of-day"
-    );
-
-  if (!element) {
-    return;
-  }
-
-  /*
-    Keep the actual player-based stat
-    if stats are already available.
-  */
-
-  if (allStats.length) {
-    createStatOfDayFromStats();
-  }
 }
 
 // ============================================================
 // RESEARCH LAB
 // ============================================================
 
-async function runResearch(
+function setResearchLoading(
   query
 ) {
-  const input =
-    document.getElementById(
-      "research-input"
-    );
-
   const results =
     document.getElementById(
       "research-results"
@@ -2538,223 +3219,24 @@ async function runResearch(
     return;
   }
 
-  query =
-    String(query || "").trim();
-
-  if (!query) {
-    results.innerHTML = `
-      <div class="research-empty">
-        <div>🔎</div>
-
-        <h3>
-          Enter a search
-        </h3>
-
-        <p>
-          Search for a player or baseball statistic.
-        </p>
-      </div>
-    `;
-
-    return;
-  }
-
-  if (input) {
-    input.value = query;
-  }
-
   results.innerHTML = `
-    <div class="loading">
-      Searching Mets data for
-      <strong>${escapeHTML(
-        query
-      )}</strong>...
-    </div>
-  `;
-
-  /*
-    First try the existing MLB research endpoint.
-  */
-
-  try {
-    const encoded =
-      encodeURIComponent(
-        query
-      );
-
-    const data =
-      await api(
-        `/api/mlb/query?question=${encoded}`
-      );
-
-    renderResearchResult(
-      query,
-      data
-    );
-
-    return;
-
-  } catch (error) {
-    console.info(
-      "Research endpoint unavailable:",
-      error
-    );
-  }
-
-  /*
-    Front-end fallback.
-
-    This lets Research Lab search the stats
-    already loaded into the page.
-  */
-
-  const lower =
-    query.toLowerCase();
-
-  const matches =
-    allStats.filter(
-      record =>
-        record.name
-          .toLowerCase()
-          .includes(lower)
-    );
-
-  if (matches.length) {
-    results.innerHTML = `
-      <div class="stats-block">
-
-        <div class="stats-block-title">
-          Search Results
-        </div>
-
-        <table class="stats-table">
-
-          <thead>
-            <tr>
-              <th>PLAYER</th>
-              <th>G</th>
-              <th>HR</th>
-              <th>RBI</th>
-              <th>AVG</th>
-              <th>OBP</th>
-              <th>SLG</th>
-              <th>OPS</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            ${matches
-              .map(record => `
-                <tr>
-
-                  <td>
-                    ${
-                      record.id
-                        ? `
-                          <button
-                            class="player-link"
-                            data-player-id="${escapeHTML(
-                              record.id
-                            )}"
-                          >
-                            ${escapeHTML(
-                              record.name
-                            )}
-                          </button>
-                        `
-                        : escapeHTML(
-                            record.name
-                          )
-                    }
-                  </td>
-
-                  <td>
-                    ${escapeHTML(
-                      formatStat(
-                        record.G
-                      )
-                    )}
-                  </td>
-
-                  <td>
-                    ${escapeHTML(
-                      formatStat(
-                        record.HR
-                      )
-                    )}
-                  </td>
-
-                  <td>
-                    ${escapeHTML(
-                      formatStat(
-                        record.RBI
-                      )
-                    )}
-                  </td>
-
-                  <td>
-                    ${escapeHTML(
-                      formatStat(
-                        record.AVG,
-                        3
-                      )
-                    )}
-                  </td>
-
-                  <td>
-                    ${escapeHTML(
-                      formatStat(
-                        record.OBP,
-                        3
-                      )
-                    )}
-                  </td>
-
-                  <td>
-                    ${escapeHTML(
-                      formatStat(
-                        record.SLG,
-                        3
-                      )
-                    )}
-                  </td>
-
-                  <td>
-                    ${escapeHTML(
-                      formatStat(
-                        record.OPS,
-                        3
-                      )
-                    )}
-                  </td>
-
-                </tr>
-              `)
-              .join("")}
-          </tbody>
-
-        </table>
+    <div class="research-loading">
+      <div class="research-spinner">
+        🧠
       </div>
-    `;
-
-    return;
-  }
-
-  results.innerHTML = `
-    <div class="research-empty">
-
-      <div>🧠</div>
 
       <h3>
-        Research Engine Ready
+        Researching...
       </h3>
 
       <p>
-        No matching loaded player data was found.
-        The Research Lab is ready to connect to
-        the full MLB Research Engine.
+        Looking through MLB data for
+        <strong>
+          ${escapeHTML(
+            query
+          )}
+        </strong>
       </p>
-
     </div>
   `;
 }
@@ -2772,44 +3254,549 @@ function renderResearchResult(
     return;
   }
 
-  const stats =
-    data?.stats ||
+  const result =
+    data?.result ||
     data;
 
+  if (
+    result?.type ===
+    "player-stat"
+  ) {
+    renderPlayerResearch(
+      query,
+      result
+    );
+
+    return;
+  }
+
+  if (
+    result?.type ===
+    "comparison"
+  ) {
+    renderComparisonResearch(
+      query,
+      result
+    );
+
+    return;
+  }
+
+  if (
+    result?.type ===
+    "leaderboard"
+  ) {
+    renderLeaderboardResearch(
+      query,
+      result
+    );
+
+    return;
+  }
+
+  if (
+    result?.type ===
+    "search"
+  ) {
+    renderSearchResearch(
+      query,
+      result
+    );
+
+    return;
+  }
+
   results.innerHTML = `
-    <div class="stats-block">
+    <div class="research-empty">
+      <div>🔎</div>
 
-      <div class="stats-block-title">
-        Research Result
-      </div>
+      <h3>
+        Research result
+      </h3>
 
-      <div style="
-        padding: 10px 0;
-        line-height: 1.7;
-      ">
-
-        <strong>
-          ${escapeHTML(query)}
-        </strong>
-
-        <pre style="
-          white-space: pre-wrap;
-          margin-top: 12px;
-          color: #667085;
-          font-family: inherit;
-          font-size: 13px;
-        ">${escapeHTML(
-          JSON.stringify(
-            stats,
-            null,
-            2
-          )
-        )}</pre>
-
-      </div>
-
+      <pre class="research-json">${escapeHTML(
+        JSON.stringify(
+          result,
+          null,
+          2
+        )
+      )}</pre>
     </div>
   `;
+}
+
+function renderPlayerResearch(
+  query,
+  result
+) {
+  const results =
+    document.getElementById(
+      "research-results"
+    );
+
+  const player =
+    result.player;
+
+  const stat =
+    result.statLabel;
+
+  results.innerHTML = `
+    <div class="research-answer">
+
+      <div class="research-answer-header">
+        <div>
+          <span class="eyebrow">
+            RESEARCH RESULT
+          </span>
+
+          <h2>
+            ${escapeHTML(
+              player?.name ||
+              "Player"
+            )}
+          </h2>
+
+          <p>
+            ${escapeHTML(
+              result.period ||
+              ""
+            )}
+          </p>
+        </div>
+
+        <div class="research-big-number">
+          ${
+            result.formattedValue ??
+            "—"
+          }
+        </div>
+      </div>
+
+      ${
+        stat
+          ? `
+            <div class="research-stat-label">
+              ${escapeHTML(
+                stat
+              )}
+            </div>
+          `
+          : ""
+      }
+
+      <div class="research-summary">
+        ${
+          stat
+            ? `
+              <strong>
+                ${escapeHTML(
+                  player?.name ||
+                  ""
+                )}
+              </strong>
+              recorded
+              <strong>
+                ${escapeHTML(
+                  result.formattedValue
+                )}
+              </strong>
+              in
+              <strong>
+                ${escapeHTML(
+                  stat
+                )}
+              </strong>
+              over
+              <strong>
+                ${escapeHTML(
+                  result.period
+                )}
+              </strong>.
+            `
+            : `
+              ${escapeHTML(
+                player?.name ||
+                "Player"
+              )}
+              was found in the MLB database.
+            `
+        }
+      </div>
+
+      <div class="research-total-grid">
+        ${renderResearchTotals(
+          result.totals,
+          result.group
+        )}
+      </div>
+
+      <div class="research-footnote">
+        Based on MLB game-log data for
+        ${CURRENT_SEASON}.
+        Games used:
+        ${escapeHTML(
+          result.gamesUsed
+        )}.
+      </div>
+    </div>
+  `;
+}
+
+function renderResearchTotals(
+  totals,
+  group
+) {
+  if (!totals) {
+    return "";
+  }
+
+  const keys =
+    group ===
+    "pitching"
+      ? [
+          ["IP", "IP"],
+          ["W", "W"],
+          ["L", "L"],
+          ["ERA", "ERA"],
+          ["WHIP", "WHIP"],
+          ["SO", "SO"],
+          ["BB", "BB"]
+        ]
+      : [
+          ["G", "G"],
+          ["AB", "AB"],
+          ["H", "H"],
+          ["HR", "HR"],
+          ["RBI", "RBI"],
+          ["AVG", "AVG"],
+          ["OBP", "OBP"],
+          ["SLG", "SLG"],
+          ["OPS", "OPS"]
+        ];
+
+  return keys
+    .map(
+      ([key, label]) => `
+        <div class="research-total">
+          <span>
+            ${label}
+          </span>
+
+          <strong>
+            ${escapeHTML(
+              formatResearchValue(
+                totals[key],
+                key
+              )
+            )}
+          </strong>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function formatResearchValue(
+  value,
+  key
+) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return "—";
+  }
+
+  if (
+    [
+      "AVG",
+      "OBP",
+      "SLG",
+      "OPS"
+    ].includes(key)
+  ) {
+    return Number(
+      value
+    )
+      .toFixed(3)
+      .replace(
+        /^0/,
+        ""
+      );
+  }
+
+  if (
+    [
+      "ERA",
+      "WHIP"
+    ].includes(key)
+  ) {
+    return Number(
+      value
+    ).toFixed(2);
+  }
+
+  return String(
+    value
+  );
+}
+
+function renderComparisonResearch(
+  query,
+  result
+) {
+  const results =
+    document.getElementById(
+      "research-results"
+    );
+
+  const rows =
+    result.results || [];
+
+  results.innerHTML = `
+    <div class="research-answer">
+
+      <span class="eyebrow">
+        PLAYER COMPARISON
+      </span>
+
+      <h2>
+        ${escapeHTML(
+          result.statLabel
+        )} comparison
+      </h2>
+
+      <div class="comparison-list">
+        ${rows
+          .map(
+            (row, index) => `
+              <div class="comparison-row">
+
+                <div class="comparison-rank">
+                  ${index + 1}
+                </div>
+
+                <div class="comparison-player">
+                  ${escapeHTML(
+                    row.player
+                  )}
+                </div>
+
+                <div class="comparison-value">
+                  ${escapeHTML(
+                    row.formattedValue
+                  )}
+                </div>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderLeaderboardResearch(
+  query,
+  result
+) {
+  const results =
+    document.getElementById(
+      "research-results"
+    );
+
+  results.innerHTML = `
+    <div class="research-answer">
+
+      <span class="eyebrow">
+        METS LEADERBOARD
+      </span>
+
+      <h2>
+        ${escapeHTML(
+          result.statLabel
+        )} leaders
+      </h2>
+
+      <div class="leaderboard-list">
+        ${result.players
+          .map(
+            (player, index) => `
+              <button
+                class="leaderboard-row"
+                data-player-id="${escapeHTML(
+                  player.id
+                )}"
+              >
+                <span class="leaderboard-rank">
+                  ${index + 1}
+                </span>
+
+                <span class="leaderboard-name">
+                  ${escapeHTML(
+                    player.name
+                  )}
+                </span>
+
+                <strong>
+                  ${escapeHTML(
+                    player.formattedValue
+                  )}
+                </strong>
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderSearchResearch(
+  query,
+  result
+) {
+  const results =
+    document.getElementById(
+      "research-results"
+    );
+
+  results.innerHTML = `
+    <div class="research-answer">
+
+      <span class="eyebrow">
+        PLAYER SEARCH
+      </span>
+
+      <h2>
+        Search results
+      </h2>
+
+      <p>
+        ${escapeHTML(
+          result.message ||
+          ""
+        )}
+      </p>
+
+      <div class="leaderboard-list">
+        ${(result.players || [])
+          .map(
+            player => `
+              <button
+                class="leaderboard-row"
+                data-player-id="${escapeHTML(
+                  player.id
+                )}"
+              >
+                <span class="leaderboard-name">
+                  ${escapeHTML(
+                    player.name
+                  )}
+                </span>
+
+                <span>
+                  ${escapeHTML(
+                    player.position
+                  )}
+                </span>
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+async function runResearch(
+  query
+) {
+  const input =
+    document.getElementById(
+      "research-input"
+    );
+
+  query =
+    String(
+      query || ""
+    ).trim();
+
+  if (!query) {
+    return;
+  }
+
+  if (input) {
+    input.value =
+      query;
+  }
+
+  setResearchLoading(
+    query
+  );
+
+  try {
+    const encoded =
+      encodeURIComponent(
+        query
+      );
+
+    const data =
+      await api(
+        `/api/mlb/query?question=${encoded}`
+      );
+
+    researchHistory.unshift({
+      query,
+      timestamp:
+        new Date()
+          .toISOString()
+    });
+
+    researchHistory =
+      researchHistory.slice(
+        0,
+        10
+      );
+
+    renderResearchResult(
+      query,
+      data
+    );
+  } catch (error) {
+    console.error(
+      "Research:",
+      error
+    );
+
+    const results =
+      document.getElementById(
+        "research-results"
+      );
+
+    if (results) {
+      results.innerHTML = `
+        <div class="error-box">
+          <strong>
+            Research failed.
+          </strong>
+
+          <br>
+
+          ${escapeHTML(
+            error.message
+          )}
+
+          <br><br>
+
+          Try a question such as:
+          <strong>
+            Francisco Lindor OPS in his last 10 games
+          </strong>
+        </div>
+      `;
+    }
+  }
 }
 
 document.addEventListener(
@@ -2837,6 +3824,26 @@ document.addEventListener(
           "research-input"
         )?.value
       );
+
+      return;
+    }
+
+    const playerButton =
+      event.target.closest(
+        "[data-player-id]"
+      );
+
+    if (
+      playerButton &&
+      (
+        playerButton.classList.contains(
+          "leaderboard-row"
+        )
+      )
+    ) {
+      openPlayer(
+        playerButton.dataset.playerId
+      );
     }
   }
 );
@@ -2860,7 +3867,7 @@ document
   );
 
 // ============================================================
-// REFRESH BUTTONS
+// REFRESH
 // ============================================================
 
 document
@@ -2911,8 +3918,17 @@ document
     loadTransactions
   );
 
+document
+  .getElementById(
+    "refresh-prospects"
+  )
+  ?.addEventListener(
+    "click",
+    loadProspects
+  );
+
 // ============================================================
-// AUTOMATIC EASTERN-TIME DAILY REFRESH
+// DAILY REFRESH
 // ============================================================
 
 let lastEasternDate =
@@ -2929,11 +3945,6 @@ setInterval(
     ) {
       lastEasternDate =
         currentEasternDate;
-
-      /*
-        The date has changed in New York.
-        Refresh schedule and standings.
-      */
 
       loadStandings();
       loadGames();
@@ -2952,22 +3963,12 @@ async function initialize() {
     "Starting Mets HQ..."
   );
 
-  /*
-    Load the most important dashboard
-    data first.
-  */
-
   await Promise.allSettled([
     loadStandings(),
     loadGames()
   ]);
 
-  /*
-    Stats aren't necessary for the first
-    paint, but load them after dashboard.
-  */
-
-  await loadStats();
+  loadStats();
 
   console.log(
     "Mets HQ ready."
