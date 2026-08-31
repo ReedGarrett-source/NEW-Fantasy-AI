@@ -11,18 +11,18 @@ const CURRENT_SEASON = 2026;
 const METS_ID = 121;
 const MLB_SPORT_ID = 1;
 
+const PUBLIC_DIR = path.join(__dirname, "public");
+const INDEX_FILE = path.join(PUBLIC_DIR, "index.html");
+
 // ============================================================
-// EXPRESS CONFIGURATION
+// MIDDLEWARE
 // ============================================================
 
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // IMPORTANT:
-// All frontend files are inside /public
-const PUBLIC_DIR = path.join(__dirname, "public");
-
-// Serve index.html, style.css, app.js, etc. from /public
+// index.html, app.js and style.css are inside /public
 app.use(express.static(PUBLIC_DIR));
 
 // ============================================================
@@ -100,7 +100,7 @@ function addDays(dateString, days) {
 }
 
 // ============================================================
-// MLB API CLIENT
+// MLB API
 // ============================================================
 
 async function mlb(endpoint, params = {}) {
@@ -118,12 +118,10 @@ async function mlb(endpoint, params = {}) {
     }
   }
 
-  console.log(`MLB API → ${url.toString()}`);
-
   const response = await fetch(url, {
     headers: {
       Accept: "application/json",
-      "User-Agent": "Mets-HQ/2.0"
+      "User-Agent": "Mets-HQ/1.0"
     }
   });
 
@@ -142,12 +140,26 @@ async function mlb(endpoint, params = {}) {
   if (!response.ok) {
     throw new Error(
       data?.message ||
-        data?.error ||
-        `MLB API error ${response.status}`
+      data?.error ||
+      `MLB API error ${response.status}`
     );
   }
 
   return data;
+}
+
+async function mlbSafe(endpoint, params = {}) {
+  try {
+    return await mlb(endpoint, params);
+  } catch (error) {
+    console.error(
+      "MLB API error:",
+      endpoint,
+      error.message
+    );
+
+    throw error;
+  }
 }
 
 // ============================================================
@@ -161,9 +173,7 @@ async function searchPlayers(query) {
     return [];
   }
 
-  const data = await mlb("people/search", {
-    q
-  });
+  const data = await mlbSafe("people/search", { q });
 
   return Array.isArray(data?.people)
     ? data.people
@@ -177,30 +187,30 @@ async function findPlayer(query) {
     return null;
   }
 
+  const exactName = normalizeName(q);
+
   const candidates = await searchPlayers(q);
 
   if (!candidates.length) {
     return null;
   }
 
-  const normalizedQuery = normalizeName(q);
-
   const exact = candidates.find(
     person =>
-      normalizeName(person.fullName) === normalizedQuery
+      normalizeName(person.fullName) === exactName
   );
 
   if (exact) {
     return exact;
   }
 
-  const startsWith = candidates.find(
+  const starts = candidates.find(
     person =>
-      normalizeName(person.fullName).startsWith(normalizedQuery)
+      normalizeName(person.fullName).startsWith(exactName)
   );
 
-  if (startsWith) {
-    return startsWith;
+  if (starts) {
+    return starts;
   }
 
   return candidates[0];
@@ -210,22 +220,17 @@ async function findPlayer(query) {
 // METS ROSTER
 // ============================================================
 
-async function getMetsRoster(season = CURRENT_SEASON) {
-  const data = await mlb(`teams/${METS_ID}/roster`, {
-    season,
-    rosterType: "fullSeason"
-  });
-
-  return Array.isArray(data?.roster)
-    ? data.roster
-    : [];
-}
-
-async function getActiveMetsRoster() {
-  const data = await mlb(`teams/${METS_ID}/roster`, {
-    season: CURRENT_SEASON,
-    rosterType: "active"
-  });
+async function getMetsRoster(
+  season = CURRENT_SEASON,
+  rosterType = "active"
+) {
+  const data = await mlbSafe(
+    `teams/${METS_ID}/roster`,
+    {
+      season,
+      rosterType
+    }
+  );
 
   return Array.isArray(data?.roster)
     ? data.roster
@@ -233,14 +238,62 @@ async function getActiveMetsRoster() {
 }
 
 async function getActiveMetsIds() {
-  const roster = await getActiveMetsRoster();
+  const roster = await getMetsRoster(
+    CURRENT_SEASON,
+    "active"
+  );
 
   return new Set(
     roster
-      .map(player => player?.person?.id || player?.id)
+      .map(player =>
+        player?.person?.id ||
+        player?.id
+      )
       .filter(Boolean)
       .map(String)
   );
+}
+
+// ============================================================
+// STATS OBJECTS
+// ============================================================
+
+function getHittingStatObject(stat = {}) {
+  return {
+    G: numberOrNull(stat.gamesPlayed),
+    AB: numberOrNull(stat.atBats),
+    R: numberOrNull(stat.runs),
+    H: numberOrNull(stat.hits),
+    "2B": numberOrNull(stat.doubles),
+    "3B": numberOrNull(stat.triples),
+    HR: numberOrNull(stat.homeRuns),
+    RBI: numberOrNull(stat.rbi),
+    BB: numberOrNull(stat.baseOnBalls),
+    SO: numberOrNull(stat.strikeOuts),
+    SB: numberOrNull(stat.stolenBases),
+    CS: numberOrNull(stat.caughtStealing),
+    AVG: numberOrNull(stat.avg),
+    OBP: numberOrNull(stat.obp),
+    SLG: numberOrNull(stat.slg),
+    OPS: numberOrNull(stat.ops)
+  };
+}
+
+function getPitchingStatObject(stat = {}) {
+  return {
+    G: numberOrNull(stat.gamesPitched),
+    GS: numberOrNull(stat.gamesStarted),
+    IP: stat.inningsPitched ?? null,
+    W: numberOrNull(stat.wins),
+    L: numberOrNull(stat.losses),
+    SV: numberOrNull(stat.saves),
+    ERA: numberOrNull(stat.era),
+    WHIP: numberOrNull(stat.whip),
+    SO: numberOrNull(stat.strikeOuts),
+    BB: numberOrNull(stat.baseOnBalls),
+    H: numberOrNull(stat.hits),
+    HR: numberOrNull(stat.homeRuns)
+  };
 }
 
 // ============================================================
@@ -250,9 +303,10 @@ async function getActiveMetsIds() {
 app.get("/api/mets/standings", async (req, res) => {
   try {
     const season =
-      Number(req.query.season) || CURRENT_SEASON;
+      Number(req.query.season) ||
+      CURRENT_SEASON;
 
-    const data = await mlb("standings", {
+    const data = await mlbSafe("standings", {
       leagueId: "104,103",
       season,
       standingsTypes: "regularSeason"
@@ -273,11 +327,30 @@ app.get("/api/mets/standings", async (req, res) => {
 
     res.json({
       success: true,
-      mets: mets || null,
+
+      mets: mets
+        ? {
+            ...mets,
+
+            wins: mets.wins,
+            losses: mets.losses,
+            gamesBack: mets.gamesBack,
+            divisionRank: mets.divisionRank,
+
+            lastTen:
+              mets.records?.find(
+                record =>
+                  record?.type === "lastTen"
+              ) || null,
+
+            streak: mets.streak || null
+          }
+        : null,
+
       standings: records
     });
   } catch (error) {
-    console.error("Standings error:", error);
+    console.error("Standings:", error);
 
     res.status(500).json({
       success: false,
@@ -293,18 +366,20 @@ app.get("/api/mets/standings", async (req, res) => {
 app.get("/api/mets/games", async (req, res) => {
   try {
     const startDate =
-      req.query.startDate || dateDaysAgo(14);
+      req.query.startDate ||
+      dateDaysAgo(14);
 
     const endDate =
       req.query.endDate ||
       addDays(todayISO(), 21);
 
-    const data = await mlb("schedule", {
+    const data = await mlbSafe("schedule", {
       sportId: MLB_SPORT_ID,
       teamId: METS_ID,
       startDate,
       endDate,
-      hydrate: "linescore,probablePitcher,team"
+      hydrate:
+        "linescore,probablePitcher,person,team"
     });
 
     const games = [];
@@ -320,7 +395,7 @@ app.get("/api/mets/games", async (req, res) => {
       games
     });
   } catch (error) {
-    console.error("Games error:", error);
+    console.error("Games:", error);
 
     res.status(500).json({
       success: false,
@@ -330,58 +405,26 @@ app.get("/api/mets/games", async (req, res) => {
 });
 
 // ============================================================
-// FULL METS ROSTER
+// ROSTER
 // ============================================================
 
 app.get("/api/mets/roster", async (req, res) => {
   try {
     const season =
-      Number(req.query.season) || CURRENT_SEASON;
+      Number(req.query.season) ||
+      CURRENT_SEASON;
 
-    const roster = await getMetsRoster(season);
-
-    const activeRoster =
-      season === CURRENT_SEASON
-        ? await getActiveMetsRoster()
-        : [];
-
-    const activeIds = new Set(
-      activeRoster
-        .map(p => p?.person?.id || p?.id)
-        .filter(Boolean)
-        .map(String)
+    const roster = await getMetsRoster(
+      season,
+      "active"
     );
-
-    const result = roster.map(player => {
-      const id =
-        player?.person?.id ||
-        player?.id ||
-        null;
-
-      return {
-        ...player,
-
-        playerId: id,
-
-        isActive:
-          season === CURRENT_SEASON
-            ? activeIds.has(String(id))
-            : false,
-
-        statusDescription:
-          player?.status?.description ||
-          player?.status?.code ||
-          "Unknown"
-      };
-    });
 
     res.json({
       success: true,
-      roster: result,
-      activePlayerIds: [...activeIds]
+      roster
     });
   } catch (error) {
-    console.error("Roster error:", error);
+    console.error("Roster:", error);
 
     res.status(500).json({
       success: false,
@@ -391,20 +434,80 @@ app.get("/api/mets/roster", async (req, res) => {
 });
 
 // ============================================================
-// STATS
+// FULL 40-MAN / ORGANIZATIONAL ROSTER
+// ============================================================
+
+app.get("/api/mets/full-roster", async (req, res) => {
+  try {
+    const season =
+      Number(req.query.season) ||
+      CURRENT_SEASON;
+
+    const types = [
+      "active",
+      "40Man",
+      "fullRoster"
+    ];
+
+    const combined = new Map();
+
+    for (const rosterType of types) {
+      try {
+        const roster = await getMetsRoster(
+          season,
+          rosterType
+        );
+
+        for (const player of roster) {
+          const id =
+            player?.person?.id ||
+            player?.id;
+
+          if (id) {
+            combined.set(
+              String(id),
+              player
+            );
+          }
+        }
+      } catch {
+        // Some MLB roster types may not be available.
+      }
+    }
+
+    res.json({
+      success: true,
+      roster: [...combined.values()]
+    });
+  } catch (error) {
+    console.error("Full roster:", error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================
+// SEASON STATS
 // ============================================================
 
 app.get("/api/mets/stats", async (req, res) => {
   try {
     const season =
-      Number(req.query.season) || CURRENT_SEASON;
+      Number(req.query.season) ||
+      CURRENT_SEASON;
 
     const group =
       req.query.group === "pitching"
         ? "pitching"
         : "hitting";
 
-    const data = await mlb("stats", {
+    const activeIds =
+      await getActiveMetsIds();
+
+    const data = await mlbSafe("stats", {
       stats: "season",
       group,
       season,
@@ -415,42 +518,50 @@ app.get("/api/mets/stats", async (req, res) => {
 
     const splits =
       Array.isArray(data?.stats)
-        ? data.stats.flatMap(groupData =>
-            Array.isArray(groupData?.splits)
-              ? groupData.splits
-              : []
+        ? data.stats.flatMap(
+            statGroup =>
+              Array.isArray(statGroup?.splits)
+                ? statGroup.splits
+                : []
           )
         : [];
 
-    // IMPORTANT:
-    // Do NOT filter stats to only active players.
-    // This allows everyone who played for the Mets
-    // during the season to remain visible.
     const stats = splits.map(split => {
-      const person = split?.player || {};
+      const person =
+        split?.player ||
+        split?.person ||
+        {};
+
+      const id =
+        person?.id ||
+        split?.player?.id ||
+        split?.person?.id ||
+        "";
 
       return {
         ...split,
 
-        playerId:
-          person?.id ||
-          split?.player?.id ||
-          null,
+        player: {
+          ...person
+        },
 
-        playerName:
-          person?.fullName ||
-          "Unknown Player"
+        isActive:
+          activeIds.has(String(id)),
+
+        active:
+          activeIds.has(String(id))
       };
     });
 
     res.json({
       success: true,
       stats,
+      activePlayerIds: [...activeIds],
       group,
       season
     });
   } catch (error) {
-    console.error("Stats error:", error);
+    console.error("Stats:", error);
 
     res.status(500).json({
       success: false,
@@ -460,19 +571,20 @@ app.get("/api/mets/stats", async (req, res) => {
 });
 
 // ============================================================
-// PLAYER PROFILE
+// PLAYER INFORMATION
 // ============================================================
 
 app.get("/api/player/:id", async (req, res) => {
   try {
     const id = req.params.id;
 
-    const data = await mlb(
+    const data = await mlbSafe(
       `people/${encodeURIComponent(id)}`
     );
 
     const player =
-      data?.people?.[0] || null;
+      data?.people?.[0] ||
+      null;
 
     if (!player) {
       return res.status(404).json({
@@ -486,7 +598,7 @@ app.get("/api/player/:id", async (req, res) => {
       player
     });
   } catch (error) {
-    console.error("Player error:", error);
+    console.error("Player:", error);
 
     res.status(500).json({
       success: false,
@@ -504,14 +616,15 @@ app.get("/api/player/:id/stats", async (req, res) => {
     const id = req.params.id;
 
     const season =
-      Number(req.query.season) || CURRENT_SEASON;
+      Number(req.query.season) ||
+      CURRENT_SEASON;
 
     const group =
       req.query.group === "pitching"
         ? "pitching"
         : "hitting";
 
-    const data = await mlb(
+    const data = await mlbSafe(
       `people/${encodeURIComponent(id)}/stats`,
       {
         stats: "season",
@@ -524,9 +637,7 @@ app.get("/api/player/:id/stats", async (req, res) => {
       Array.isArray(data?.stats)
         ? data.stats.flatMap(
             groupData =>
-              Array.isArray(groupData?.splits)
-                ? groupData.splits
-                : []
+              groupData?.splits || []
           )
         : [];
 
@@ -555,14 +666,15 @@ app.get("/api/player/:id/games", async (req, res) => {
     const id = req.params.id;
 
     const season =
-      Number(req.query.season) || CURRENT_SEASON;
+      Number(req.query.season) ||
+      CURRENT_SEASON;
 
     const group =
       req.query.group === "pitching"
         ? "pitching"
         : "hitting";
 
-    const data = await mlb(
+    const data = await mlbSafe(
       `people/${encodeURIComponent(id)}/stats`,
       {
         stats: "gameLog",
@@ -571,19 +683,17 @@ app.get("/api/player/:id/games", async (req, res) => {
       }
     );
 
-    const splits =
+    const games =
       Array.isArray(data?.stats)
         ? data.stats.flatMap(
             groupData =>
-              Array.isArray(groupData?.splits)
-                ? groupData.splits
-                : []
+              groupData?.splits || []
           )
         : [];
 
     res.json({
       success: true,
-      games: splits,
+      games,
       season,
       group
     });
@@ -601,67 +711,85 @@ app.get("/api/player/:id/games", async (req, res) => {
 // TRANSACTIONS
 // ============================================================
 
-app.get("/api/mets/transactions", async (req, res) => {
-  try {
-    const startDate =
-      req.query.startDate || dateDaysAgo(45);
+app.get(
+  "/api/mets/transactions",
+  async (req, res) => {
+    try {
+      const startDate =
+        req.query.startDate ||
+        dateDaysAgo(45);
 
-    const endDate =
-      req.query.endDate || todayISO();
+      const endDate =
+        req.query.endDate ||
+        todayISO();
 
-    const data = await mlb("transactions", {
-      teamId: METS_ID,
-      startDate,
-      endDate
-    });
+      const data = await mlbSafe(
+        "transactions",
+        {
+          teamId: METS_ID,
+          startDate,
+          endDate
+        }
+      );
 
-    const transactions =
-      Array.isArray(data?.transactions)
-        ? data.transactions
-        : [];
+      const transactions =
+        Array.isArray(data?.transactions)
+          ? data.transactions
+          : [];
 
-    transactions.sort(
-      (a, b) =>
-        new Date(b.date) -
-        new Date(a.date)
-    );
+      transactions.sort(
+        (a, b) =>
+          new Date(b.date) -
+          new Date(a.date)
+      );
 
-    res.json({
-      success: true,
-      transactions
-    });
-  } catch (error) {
-    console.error("Transactions:", error);
+      res.json({
+        success: true,
+        transactions
+      });
+    } catch (error) {
+      console.error("Transactions:", error);
 
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
   }
-});
+);
 
 // ============================================================
-// MINOR LEAGUE / PROSPECT CENTER
+// MINOR LEAGUE / PROSPECTS
 // ============================================================
 
 async function getMetsMinorLeagueTeams() {
-  const sports = [11, 12, 13, 14];
+  const sports = [
+    11,
+    12,
+    13,
+    14
+  ];
 
   const results = [];
 
   for (const sportId of sports) {
     try {
-      const data = await mlb("teams", {
-        sportId,
-        season: CURRENT_SEASON
-      });
+      const data = await mlbSafe(
+        "teams",
+        {
+          sportId,
+          season: CURRENT_SEASON
+        }
+      );
 
       for (const team of data?.teams || []) {
         const parentId =
           Number(team?.parentOrgId);
 
         const parentName =
-          normalizeName(team?.parentOrgName);
+          normalizeName(
+            team?.parentOrgName
+          );
 
         if (
           parentId === METS_ID ||
@@ -673,7 +801,7 @@ async function getMetsMinorLeagueTeams() {
       }
     } catch (error) {
       console.warn(
-        "Minor league team lookup failed:",
+        "Minor league lookup failed:",
         sportId,
         error.message
       );
@@ -684,7 +812,10 @@ async function getMetsMinorLeagueTeams() {
 
   for (const team of results) {
     if (team?.id) {
-      unique.set(String(team.id), team);
+      unique.set(
+        String(team.id),
+        team
+      );
     }
   }
 
@@ -693,155 +824,328 @@ async function getMetsMinorLeagueTeams() {
 
 async function getMinorLeagueRoster(teamId) {
   try {
-    const data = await mlb(
+    const data = await mlbSafe(
       `teams/${teamId}/roster`,
       {
-        season: CURRENT_SEASON,
-        rosterType: "fullSeason"
+        season: CURRENT_SEASON
       }
     );
 
     return Array.isArray(data?.roster)
       ? data.roster
       : [];
-  } catch (error) {
-    console.warn(
-      "Minor roster error:",
-      teamId,
-      error.message
-    );
-
+  } catch {
     return [];
   }
 }
 
-app.get("/api/mets/prospects", async (req, res) => {
-  try {
-    const teams =
-      await getMetsMinorLeagueTeams();
+app.get(
+  "/api/mets/prospects",
+  async (req, res) => {
+    try {
+      const teams =
+        await getMetsMinorLeagueTeams();
 
-    const allPlayers = [];
+      const allPlayers = [];
 
-    for (const team of teams) {
-      const roster =
-        await getMinorLeagueRoster(team.id);
+      for (const team of teams) {
+        const roster =
+          await getMinorLeagueRoster(
+            team.id
+          );
 
-      for (const player of roster) {
-        const person =
-          player?.person || {};
+        for (const player of roster) {
+          const person =
+            player?.person || {};
 
-        if (!person.id) {
-          continue;
+          allPlayers.push({
+            id: person.id,
+
+            name:
+              person.fullName ||
+              "Unknown Player",
+
+            firstName:
+              person.firstName ||
+              "",
+
+            lastName:
+              person.lastName ||
+              "",
+
+            position:
+              player?.position?.abbreviation ||
+              player?.position?.name ||
+              person?.primaryPosition?.abbreviation ||
+              "—",
+
+            jerseyNumber:
+              player?.jerseyNumber ||
+              person?.primaryNumber ||
+              "—",
+
+            teamId:
+              team.id,
+
+            teamName:
+              team.name,
+
+            level:
+              team.sport?.name ||
+              team.sport?.abbreviation ||
+              "Minor League",
+
+            status:
+              player?.status?.description ||
+              player?.status?.code ||
+              "",
+
+            birthDate:
+              person.birthDate ||
+              null,
+
+            age:
+              person.currentAge ||
+              null,
+
+            bats:
+              person.batSide?.description ||
+              null,
+
+            throws:
+              person.pitchHand?.description ||
+              null
+          });
         }
-
-        allPlayers.push({
-          id: person.id,
-
-          name:
-            person.fullName ||
-            "Unknown Player",
-
-          position:
-            player?.position?.abbreviation ||
-            player?.position?.name ||
-            person?.primaryPosition?.abbreviation ||
-            "—",
-
-          positionName:
-            player?.position?.name ||
-            person?.primaryPosition?.name ||
-            "Unknown",
-
-          jerseyNumber:
-            player?.jerseyNumber ||
-            person?.primaryNumber ||
-            "—",
-
-          teamId: team.id,
-
-          teamName:
-            team.name,
-
-          level:
-            team.sport?.name ||
-            team.sport?.abbreviation ||
-            "Minor League",
-
-          league:
-            team.league?.name ||
-            "Unknown",
-
-          division:
-            team.division?.name ||
-            "Unknown",
-
-          status:
-            player?.status?.description ||
-            player?.status?.code ||
-            "Unknown",
-
-          birthDate:
-            person.birthDate ||
-            null,
-
-          birthCity:
-            person.birthCity ||
-            null,
-
-          birthState:
-            person.birthStateProvince ||
-            null,
-
-          birthCountry:
-            person.birthCountry ||
-            null,
-
-          height:
-            person.height ||
-            null,
-
-          weight:
-            person.weight ||
-            null,
-
-          bats:
-            person.bats?.description ||
-            null,
-
-          throws:
-            person.throws?.description ||
-            null,
-
-          mlbDebutDate:
-            person.mlbDebutDate ||
-            null
-        });
       }
+
+      const unique = new Map();
+
+      for (const player of allPlayers) {
+        if (player.id) {
+          unique.set(
+            String(player.id),
+            player
+          );
+        }
+      }
+
+      res.json({
+        success: true,
+        teams,
+        prospects: [...unique.values()]
+      });
+    } catch (error) {
+      console.error("Prospects:", error);
+
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
     }
+  }
+);
 
-    const unique = new Map();
+// ============================================================
+// STATCAST / BASEBALL SAVANT
+// ============================================================
 
-    for (const player of allPlayers) {
-      unique.set(
-        String(player.id),
-        player
+async function savantRequest(url, params = {}) {
+  const target = new URL(url);
+
+  for (const [key, value] of Object.entries(params)) {
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+    ) {
+      target.searchParams.set(
+        key,
+        String(value)
       );
     }
-
-    res.json({
-      success: true,
-      teams,
-      prospects: [...unique.values()]
-    });
-  } catch (error) {
-    console.error("Prospects:", error);
-
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
   }
-});
+
+  const response = await fetch(target, {
+    headers: {
+      Accept: "text/csv,application/json",
+      "User-Agent": "Mets-HQ/1.0"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Baseball Savant error ${response.status}`
+    );
+  }
+
+  return await response.text();
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let insideQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '"' && insideQuotes && next === '"') {
+      value += '"';
+      i++;
+      continue;
+    }
+
+    if (char === '"') {
+      insideQuotes = !insideQuotes;
+      continue;
+    }
+
+    if (char === "," && !insideQuotes) {
+      row.push(value);
+      value = "";
+      continue;
+    }
+
+    if (
+      (char === "\n" || char === "\r") &&
+      !insideQuotes
+    ) {
+      if (char === "\r" && next === "\n") {
+        i++;
+      }
+
+      row.push(value);
+      value = "";
+
+      if (row.some(cell => cell !== "")) {
+        rows.push(row);
+      }
+
+      row = [];
+      continue;
+    }
+
+    value += char;
+  }
+
+  if (value.length || row.length) {
+    row.push(value);
+
+    if (row.some(cell => cell !== "")) {
+      rows.push(row);
+    }
+  }
+
+  if (!rows.length) {
+    return [];
+  }
+
+  const headers = rows[0];
+
+  return rows.slice(1).map(columns => {
+    const object = {};
+
+    headers.forEach((header, index) => {
+      object[header] =
+        columns[index] ?? "";
+    });
+
+    return object;
+  });
+}
+
+function statcastNumber(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const n = Number(value);
+
+  return Number.isFinite(n)
+    ? n
+    : null;
+}
+
+app.get(
+  "/api/statcast/player/:id",
+  async (req, res) => {
+    try {
+      const playerId =
+        req.params.id;
+
+      const startDate =
+        req.query.startDate ||
+        dateDaysAgo(30);
+
+      const endDate =
+        req.query.endDate ||
+        todayISO();
+
+      const group =
+        req.query.group === "pitching"
+          ? "pitching"
+          : "hitting";
+
+      const csv =
+        await savantRequest(
+          "https://baseballsavant.mlb.com/leaderboard/custom",
+          {
+            type: "batter",
+            year: CURRENT_SEASON,
+            player_lookup:
+              playerId,
+            player_type:
+              "batter",
+            min_pas: 0,
+            sort_col:
+              "pa",
+            sort_order:
+              "desc",
+            run_scoring:
+              "standard"
+          }
+        );
+
+      const rows =
+        parseCSV(csv);
+
+      const playerRows =
+        rows.filter(
+          row =>
+            String(
+              row.player_id
+            ) === String(playerId)
+        );
+
+      res.json({
+        success: true,
+        playerId,
+        group,
+        startDate,
+        endDate,
+        stats: playerRows
+      });
+    } catch (error) {
+      console.error(
+        "Statcast:",
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        error:
+          error.message
+      });
+    }
+  }
+);
 
 // ============================================================
 // RESEARCH ENGINE
@@ -856,15 +1160,15 @@ const STAT_ALIASES = {
 
   obp: [
     "obp",
-    "on base percentage",
-    "on-base percentage",
-    "on base"
+    "on base",
+    "on-base",
+    "on base percentage"
   ],
 
   slg: [
     "slg",
-    "slugging percentage",
-    "slugging"
+    "slugging",
+    "slugging percentage"
   ],
 
   ops: [
@@ -874,55 +1178,55 @@ const STAT_ALIASES = {
   ],
 
   hr: [
-    "home runs",
-    "home run",
-    "homers",
+    "hr",
     "hrs",
-    "hr"
+    "home run",
+    "home runs",
+    "homers"
   ],
 
   rbi: [
-    "runs batted in",
+    "rbi",
     "rbis",
-    "rbi"
+    "runs batted in"
   ],
 
   hits: [
-    "hits",
-    "hit"
+    "hit",
+    "hits"
   ],
 
   runs: [
-    "runs",
-    "run"
+    "run",
+    "runs"
   ],
 
   ab: [
-    "at bats",
-    "at-bats",
+    "ab",
     "at bat",
-    "ab"
+    "at bats",
+    "at-bats"
   ],
 
   walks: [
-    "walks",
     "walk",
-    "base on balls",
-    "bb"
+    "walks",
+    "bb",
+    "base on balls"
   ],
 
   strikeouts: [
-    "strikeouts",
     "strikeout",
-    "strike outs",
+    "strikeouts",
     "strike out",
+    "strike outs",
     "so"
   ],
 
   sb: [
-    "stolen bases",
+    "sb",
     "stolen base",
-    "sb"
+    "stolen bases"
   ],
 
   era: [
@@ -934,54 +1238,62 @@ const STAT_ALIASES = {
   ],
 
   wins: [
-    "wins",
-    "win"
+    "win",
+    "wins"
   ],
 
   losses: [
-    "losses",
-    "loss"
+    "loss",
+    "losses"
   ],
 
   saves: [
-    "saves",
-    "save"
+    "save",
+    "saves"
   ],
 
   ip: [
-    "innings pitched",
+    "ip",
     "innings",
-    "ip"
+    "innings pitched"
   ]
 };
 
 function detectStat(query) {
-  const lower =
-    query.toLowerCase();
+  const lower = query.toLowerCase();
 
-  // Longer phrases first.
-  const entries =
-    Object.entries(STAT_ALIASES)
-      .sort(
-        (a, b) =>
-          Math.max(...b[1].map(x => x.length)) -
-          Math.max(...a[1].map(x => x.length))
-      );
+  const ordered = [
+    "ops",
+    "obp",
+    "slg",
+    "avg",
+    "era",
+    "whip",
+    "hr",
+    "rbi",
+    "hits",
+    "runs",
+    "ab",
+    "walks",
+    "strikeouts",
+    "sb",
+    "wins",
+    "losses",
+    "saves",
+    "ip"
+  ];
 
-  for (const [key, aliases] of entries) {
-    for (const alias of aliases) {
-      const pattern =
-        new RegExp(
-          `(^|\\s)${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s|$)`,
-          "i"
-        );
+  for (const key of ordered) {
+    const aliases =
+      STAT_ALIASES[key];
 
-      if (
-        pattern.test(lower) ||
-        lower.includes(alias)
-      ) {
-        return key;
-      }
+    if (
+      aliases.some(
+        alias =>
+          lower.includes(alias)
+      )
+    ) {
+      return key;
     }
   }
 
@@ -994,14 +1306,16 @@ function detectGroup(query) {
 
   if (
     lower.includes("pitch") ||
-    lower.includes("pitching") ||
+    lower.includes("pitcher") ||
+    lower.includes("pitchers") ||
     lower.includes("era") ||
     lower.includes("whip") ||
-    lower.includes("innings pitched") ||
+    lower.includes("innings") ||
+    lower.includes("strikeout") ||
+    lower.includes("strikeouts") ||
     lower.includes("saves") ||
-    lower.includes("strikeout rate") ||
-    lower.includes("k/9") ||
-    lower.includes("bb/9")
+    lower.includes("wins") ||
+    lower.includes("losses")
   ) {
     return "pitching";
   }
@@ -1019,8 +1333,7 @@ function detectLastN(query) {
     return null;
   }
 
-  const n =
-    Number(match[1]);
+  const n = Number(match[1]);
 
   if (
     !Number.isFinite(n) ||
@@ -1045,15 +1358,13 @@ function parseSinceDate(query) {
 
   let value = match[1];
 
-  if (/^\d{4}-/.test(value)) {
-    return formatDateISO(value);
-  }
-
   if (!/\d{4}/.test(value)) {
     value += `, ${CURRENT_SEASON}`;
   }
 
-  return formatDateISO(new Date(value));
+  return formatDateISO(
+    new Date(value)
+  );
 }
 
 function parseDateRange(query) {
@@ -1078,16 +1389,19 @@ function parseDateRange(query) {
   }
 
   return {
-    start: formatDateISO(new Date(start)),
-    end: formatDateISO(new Date(end))
+    start:
+      formatDateISO(new Date(start)),
+
+    end:
+      formatDateISO(new Date(end))
   };
 }
 
 // ============================================================
-// FLEXIBLE PLAYER DETECTION
+// FLEXIBLE PLAYER EXTRACTION
 // ============================================================
 
-const COMMON_MLB_NAMES = [
+const KNOWN_METS = [
   "Francisco Lindor",
   "Juan Soto",
   "Brandon Nimmo",
@@ -1100,9 +1414,10 @@ const COMMON_MLB_NAMES = [
   "Ronny Mauricio",
   "Tyrone Taylor",
   "Cedric Mullins",
-  "Carson Benge",
-  "Bo Bichette",
-  "Marcus Semien"
+  "Kodai Senga",
+  "Sean Manaea",
+  "David Peterson",
+  "Nate Lavender"
 ];
 
 function parsePlayerNames(query) {
@@ -1111,23 +1426,94 @@ function parsePlayerNames(query) {
   const normalizedQuery =
     normalizeName(query);
 
-  for (const name of COMMON_MLB_NAMES) {
+  for (const name of KNOWN_METS) {
     if (
       normalizedQuery.includes(
         normalizeName(name)
       )
     ) {
-      found.push({
-        fullName: name
-      });
+      found.push(name);
     }
   }
 
   return found;
 }
 
+function cleanResearchSearch(query) {
+  return query
+    .replace(
+      /\blast\s+\d+\s+(?:games?|appearances?)\b/gi,
+      ""
+    )
+    .replace(
+      /\bsince\s+[A-Za-z]+\s+\d{1,2}(?:,\s*\d{4})?/gi,
+      ""
+    )
+    .replace(
+      /\bfrom\s+.+?\s+(?:to|through|-)\s+.+/gi,
+      ""
+    )
+    .replace(
+      /\bwhat (?:is|are)\b/gi,
+      ""
+    )
+    .replace(
+      /\bhow many\b/gi,
+      ""
+    )
+    .replace(
+      /\bwhat's\b/gi,
+      ""
+    )
+    .replace(
+      /\bstats?\b/gi,
+      ""
+    )
+    .replace(
+      /\bstatistics\b/gi,
+      ""
+    )
+    .replace(
+      /\bOPS\b/gi,
+      ""
+    )
+    .replace(
+      /\bAVG\b/gi,
+      ""
+    )
+    .replace(
+      /\bOBP\b/gi,
+      ""
+    )
+    .replace(
+      /\bSLG\b/gi,
+      ""
+    )
+    .replace(
+      /\bHR\b/gi,
+      ""
+    )
+    .replace(
+      /\bhome runs?\b/gi,
+      ""
+    )
+    .replace(
+      /\bhits?\b/gi,
+      ""
+    )
+    .replace(
+      /\bruns?\b/gi,
+      ""
+    )
+    .replace(
+      /\bcompare\b/gi,
+      ""
+    )
+    .trim();
+}
+
 // ============================================================
-// HITTING CALCULATIONS
+// HIT / PITCH TOTAL CALCULATIONS
 // ============================================================
 
 function calculateHittingTotals(games) {
@@ -1150,7 +1536,8 @@ function calculateHittingTotals(games) {
 
   for (const split of games) {
     const stat =
-      split?.stat || {};
+      split?.stat ||
+      {};
 
     totals.G++;
 
@@ -1226,8 +1613,7 @@ function calculateHittingTotals(games) {
       : null;
 
   const OPS =
-    OBP !== null &&
-    SLG !== null
+    OBP !== null && SLG !== null
       ? OBP + SLG
       : null;
 
@@ -1240,40 +1626,23 @@ function calculateHittingTotals(games) {
   };
 }
 
-// ============================================================
-// PITCHING CALCULATIONS
-// ============================================================
+function parseInnings(value) {
+  const ip = String(value ?? "0");
 
-function inningsToDecimal(ip) {
-  if (
-    ip === null ||
-    ip === undefined
-  ) {
-    return 0;
-  }
-
-  const value =
-    String(ip);
-
-  const parts =
-    value.split(".");
+  const parts = ip.split(".");
 
   const whole =
     Number(parts[0]) || 0;
 
-  if (parts.length === 1) {
-    return whole;
-  }
+  let fraction = 0;
 
   if (parts[1] === "1") {
-    return whole + 1 / 3;
+    fraction = 1 / 3;
+  } else if (parts[1] === "2") {
+    fraction = 2 / 3;
   }
 
-  if (parts[1] === "2") {
-    return whole + 2 / 3;
-  }
-
-  return whole;
+  return whole + fraction;
 }
 
 function calculatePitchingTotals(games) {
@@ -1289,10 +1658,11 @@ function calculatePitchingTotals(games) {
 
   for (const split of games) {
     const stat =
-      split?.stat || {};
+      split?.stat ||
+      {};
 
     innings +=
-      inningsToDecimal(
+      parseInnings(
         stat.inningsPitched
       );
 
@@ -1347,7 +1717,7 @@ function calculatePitchingTotals(games) {
 }
 
 // ============================================================
-// STAT FORMATTING
+// RESEARCH FORMATTING
 // ============================================================
 
 function statLabel(stat) {
@@ -1373,7 +1743,7 @@ function statLabel(stat) {
   };
 
   return labels[stat] ||
-    String(stat || "").toUpperCase();
+    String(stat).toUpperCase();
 }
 
 function getStatValue(totals, stat) {
@@ -1398,7 +1768,7 @@ function getStatValue(totals, stat) {
     ip: "IP"
   };
 
-  return totals?.[map[stat]];
+  return totals[map[stat]];
 }
 
 function formatResearchNumber(value, stat) {
@@ -1411,7 +1781,12 @@ function formatResearchNumber(value, stat) {
   }
 
   if (
-    ["avg", "obp", "slg", "ops"].includes(stat)
+    [
+      "avg",
+      "obp",
+      "slg",
+      "ops"
+    ].includes(stat)
   ) {
     return Number(value)
       .toFixed(3)
@@ -1419,13 +1794,16 @@ function formatResearchNumber(value, stat) {
   }
 
   if (
-    ["era", "whip"].includes(stat)
+    stat === "era" ||
+    stat === "whip"
   ) {
-    return Number(value).toFixed(2);
+    return Number(value)
+      .toFixed(2);
   }
 
   if (stat === "ip") {
-    return Number(value).toFixed(2);
+    return Number(value)
+      .toFixed(1);
   }
 
   return String(
@@ -1434,30 +1812,38 @@ function formatResearchNumber(value, stat) {
 }
 
 // ============================================================
-// GAME LOG RETRIEVAL
+// GAME LOG
 // ============================================================
 
 async function getPlayerGameStats(
   playerId,
   group
 ) {
-  const data = await mlb(
-    `people/${playerId}/stats`,
-    {
-      stats: "gameLog",
-      season: CURRENT_SEASON,
-      group
-    }
-  );
+  const data =
+    await mlbSafe(
+      `people/${playerId}/stats`,
+      {
+        stats: "gameLog",
+        season: CURRENT_SEASON,
+        group
+      }
+    );
 
   return Array.isArray(data?.stats)
     ? data.stats.flatMap(
         item =>
-          Array.isArray(item?.splits)
-            ? item.splits
-            : []
+          item?.splits || []
       )
     : [];
+}
+
+function getGameDate(split) {
+  return (
+    split?.date ||
+    split?.gameDate ||
+    split?.game?.gameDate ||
+    null
+  );
 }
 
 function filterGamesByDate(
@@ -1467,9 +1853,7 @@ function filterGamesByDate(
 ) {
   return games.filter(split => {
     const date =
-      split?.date ||
-      split?.gameDate ||
-      split?.game?.gameDate;
+      getGameDate(split);
 
     if (!date) {
       return false;
@@ -1486,17 +1870,20 @@ function filterGamesByDate(
 }
 
 // ============================================================
-// RESEARCH PLAYER
+// SINGLE PLAYER RESEARCH
 // ============================================================
 
-async function researchPlayer(player, query) {
+async function researchPlayer(
+  player,
+  query
+) {
   const group =
     detectGroup(query);
 
   const stat =
     detectStat(query);
 
-  const games =
+  let games =
     await getPlayerGameStats(
       player.id,
       group
@@ -1504,16 +1891,8 @@ async function researchPlayer(player, query) {
 
   games.sort(
     (a, b) =>
-      new Date(
-        b.date ||
-          b.gameDate ||
-          b.game?.gameDate
-      ) -
-      new Date(
-        a.date ||
-          a.gameDate ||
-          a.game?.gameDate
-      )
+      new Date(getGameDate(b)) -
+      new Date(getGameDate(a))
   );
 
   const lastN =
@@ -1571,12 +1950,19 @@ async function researchPlayer(player, query) {
 
   const totals =
     group === "pitching"
-      ? calculatePitchingTotals(selected)
-      : calculateHittingTotals(selected);
+      ? calculatePitchingTotals(
+          selected
+        )
+      : calculateHittingTotals(
+          selected
+        );
 
   const value =
     stat
-      ? getStatValue(totals, stat)
+      ? getStatValue(
+          totals,
+          stat
+        )
       : null;
 
   return {
@@ -1618,152 +2004,124 @@ async function researchPlayer(player, query) {
 }
 
 // ============================================================
-// LEADERBOARDS
+// PLAYER COMPARISON
+// ============================================================
+
+async function comparePlayers(
+  players,
+  query
+) {
+  const stat =
+    detectStat(query) ||
+    "ops";
+
+  const results = [];
+
+  for (const player of players) {
+    const result =
+      await researchPlayer(
+        player,
+        query
+      );
+
+    const value =
+      getStatValue(
+        result.totals,
+        stat
+      );
+
+    results.push({
+      player:
+        player.fullName,
+
+      id:
+        player.id,
+
+      value,
+
+      formattedValue:
+        formatResearchNumber(
+          value,
+          stat
+        )
+    });
+  }
+
+  results.sort(
+    (a, b) =>
+      (b.value ?? -Infinity) -
+      (a.value ?? -Infinity)
+  );
+
+  return {
+    type: "comparison",
+
+    stat,
+
+    statLabel:
+      statLabel(stat),
+
+    results
+  };
+}
+
+// ============================================================
+// METS LEADERS
 // ============================================================
 
 async function metsLeaders(query) {
   const group =
     detectGroup(query);
 
-  const stat =
-    detectStat(query) ||
-    (
+  let stat =
+    detectStat(query);
+
+  if (!stat) {
+    stat =
       group === "pitching"
         ? "era"
-        : "hr"
-    );
+        : "hr";
+  }
 
   const data =
-    await mlb("stats", {
-      stats: "season",
-      group,
-      season: CURRENT_SEASON,
-      teamIds: METS_ID,
-      sportIds: MLB_SPORT_ID,
-      hydrate: "person,team"
-    });
+    await mlbSafe(
+      "stats",
+      {
+        stats: "season",
+        group,
+        season: CURRENT_SEASON,
+        teamIds: METS_ID,
+        sportIds: MLB_SPORT_ID,
+        hydrate: "person"
+      }
+    );
 
   const splits =
     data?.stats?.flatMap(
       groupData =>
-        Array.isArray(groupData?.splits)
-          ? groupData.splits
-          : []
+        groupData?.splits || []
     ) || [];
 
   const mapped =
     splits.map(split => {
       const person =
-        split?.player || {};
+        split?.player ||
+        {};
 
       const totals =
         group === "pitching"
-          ? {
-              G:
-                numberOrNull(
-                  split?.stat?.gamesPitched
-                ),
-              IP:
-                split?.stat?.inningsPitched,
-              W:
-                numberOrNull(
-                  split?.stat?.wins
-                ),
-              L:
-                numberOrNull(
-                  split?.stat?.losses
-                ),
-              SV:
-                numberOrNull(
-                  split?.stat?.saves
-                ),
-              ERA:
-                numberOrNull(
-                  split?.stat?.era
-                ),
-              WHIP:
-                numberOrNull(
-                  split?.stat?.whip
-                ),
-              SO:
-                numberOrNull(
-                  split?.stat?.strikeOuts
-                ),
-              BB:
-                numberOrNull(
-                  split?.stat?.baseOnBalls
-                ),
-              H:
-                numberOrNull(
-                  split?.stat?.hits
-                ),
-              HR:
-                numberOrNull(
-                  split?.stat?.homeRuns
-                )
-            }
-          : {
-              G:
-                numberOrNull(
-                  split?.stat?.gamesPlayed
-                ),
-              AB:
-                numberOrNull(
-                  split?.stat?.atBats
-                ),
-              R:
-                numberOrNull(
-                  split?.stat?.runs
-                ),
-              H:
-                numberOrNull(
-                  split?.stat?.hits
-                ),
-              "2B":
-                numberOrNull(
-                  split?.stat?.doubles
-                ),
-              "3B":
-                numberOrNull(
-                  split?.stat?.triples
-                ),
-              HR:
-                numberOrNull(
-                  split?.stat?.homeRuns
-                ),
-              RBI:
-                numberOrNull(
-                  split?.stat?.rbi
-                ),
-              BB:
-                numberOrNull(
-                  split?.stat?.baseOnBalls
-                ),
-              SO:
-                numberOrNull(
-                  split?.stat?.strikeOuts
-                ),
-              SB:
-                numberOrNull(
-                  split?.stat?.stolenBases
-                ),
-              AVG:
-                numberOrNull(
-                  split?.stat?.avg
-                ),
-              OBP:
-                numberOrNull(
-                  split?.stat?.obp
-                ),
-              SLG:
-                numberOrNull(
-                  split?.stat?.slg
-                ),
-              OPS:
-                numberOrNull(
-                  split?.stat?.ops
-                )
-            };
+          ? getPitchingStatObject(
+              split.stat || {}
+            )
+          : getHittingStatObject(
+              split.stat || {}
+            );
+
+      const value =
+        getStatValue(
+          totals,
+          stat
+        );
 
       return {
         name:
@@ -1773,406 +2131,339 @@ async function metsLeaders(query) {
         id:
           person.id,
 
-        value:
-          getStatValue(
-            totals,
-            stat
-          ),
+        value,
 
         formattedValue:
           formatResearchNumber(
-            getStatValue(
-              totals,
-              stat
-            ),
+            value,
             stat
-          )
+          ),
+
+        totals
       };
     });
 
   const filtered =
     mapped.filter(
       row =>
-        row.value !== null &&
-        row.value !== undefined
+        row.value !== null
     );
 
-  // ERA/WHIP are better when LOWER.
-  if (
-    stat === "era" ||
-    stat === "whip"
-  ) {
-    filtered.sort(
-      (a, b) =>
-        (a.value ?? Infinity) -
-        (b.value ?? Infinity)
-    );
-  } else {
-    filtered.sort(
-      (a, b) =>
-        (b.value ?? -Infinity) -
-        (a.value ?? -Infinity)
-    );
-  }
+  filtered.sort(
+    (a, b) =>
+      (
+        b.value ??
+        -Infinity
+      ) -
+      (
+        a.value ??
+        -Infinity
+      )
+  );
 
   return {
     type: "leaderboard",
+
     group,
     stat,
-    statLabel: statLabel(stat),
-    players: filtered.slice(0, 10)
+
+    statLabel:
+      statLabel(stat),
+
+    players:
+      filtered.slice(0, 10)
   };
 }
 
 // ============================================================
-// RESEARCH QUERY
+// RESEARCH API
 // ============================================================
 
-app.get("/api/mlb/query", async (req, res) => {
-  const query =
-    cleanString(req.query.question);
+app.get(
+  "/api/mlb/query",
+  async (req, res) => {
+    const query =
+      cleanString(
+        req.query.question
+      );
 
-  if (!query) {
-    return res.status(400).json({
-      success: false,
-      error: "Enter a baseball question."
-    });
-  }
-
-  try {
-    const lower =
-      query.toLowerCase();
-
-    // --------------------------------------------------------
-    // LEADERBOARDS
-    // --------------------------------------------------------
-
-    if (
-      lower.includes("leader") ||
-      lower.includes("leaders") ||
-      lower.includes("most home runs") ||
-      lower.includes("most hr")
-    ) {
-      const result =
-        await metsLeaders(query);
-
-      return res.json({
-        success: true,
-        query,
-        result
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Enter a baseball question."
       });
     }
 
-    // --------------------------------------------------------
-    // PLAYER IDENTIFICATION
-    // --------------------------------------------------------
+    try {
+      const lower =
+        query.toLowerCase();
 
-    let players =
-      parsePlayerNames(query);
+      // --------------------------------------------------------
+      // METS LEADERBOARD QUESTIONS
+      // --------------------------------------------------------
 
-    // Resolve known names into actual MLB players.
-    if (players.length) {
-      const resolved = [];
+      const isLeaderboard =
+        lower.includes("leader") ||
+        lower.includes("leaders") ||
+        lower.includes("most home runs") ||
+        lower.includes("most hr") ||
+        lower.includes("highest ops") ||
+        lower.includes("best batting average") ||
+        lower.includes("lowest era");
 
-      for (const candidate of players) {
-        const player =
-          await findPlayer(
-            candidate.fullName
+      if (isLeaderboard) {
+        const result =
+          await metsLeaders(
+            query
           );
 
-        if (player) {
-          resolved.push(player);
-        }
+        return res.json({
+          success: true,
+          query,
+          result
+        });
       }
 
-      players = resolved;
-    }
+      // --------------------------------------------------------
+      // FIND PLAYERS
+      // --------------------------------------------------------
 
-    // If known-name matching didn't find anything,
-    // search the MLB database using cleaned query terms.
-    if (!players.length) {
-      const cleaned =
-        query
-          .replace(
-            /\blast\s+\d+\s+(?:games?|appearances?)\b/gi,
-            ""
-          )
-          .replace(
-            /\bsince\s+[A-Za-z]+\s+\d{1,2}(?:,\s*\d{4})?/gi,
-            ""
-          )
-          .replace(
-            /\bfrom\s+.+?\s+(?:to|through|-)\s+.+/gi,
-            ""
-          )
-          .replace(
-            /\bwhat\s+(?:is|are)\b/gi,
-            ""
-          )
-          .replace(
-            /\bhow\s+(?:is|are|many|did)\b/gi,
-            ""
-          )
-          .replace(
-            /\bcompare\b/gi,
-            ""
-          )
-          .replace(
-            /\bstats?\b/gi,
-            ""
-          )
-          .replace(
-            /\bstatistics\b/gi,
-            ""
-          )
-          .replace(
-            /\bbaseball\b/gi,
-            ""
-          )
-          .replace(
-            /\bplayers?\b/gi,
-            ""
-          )
-          .replace(
-            /\bOPS\b/gi,
-            ""
-          )
-          .trim();
+      let players =
+        parsePlayerNames(
+          query
+        );
 
-      const searchTerms =
-        cleaned
-          .split(
-            /\s+(?:vs\.?|versus|and)\s+/i
-          )
-          .map(term =>
-            term
-              .replace(
-                /\bwho\s+has\s+more\b/gi,
-                ""
-              )
-              .trim()
-          )
-          .filter(Boolean);
+      if (!players.length) {
+        const cleaned =
+          cleanResearchSearch(
+            query
+          );
 
-      for (
-        const term of
-        searchTerms.slice(0, 4)
-      ) {
-        const player =
-          await findPlayer(term);
+        const searchTerms =
+          cleaned
+            .split(
+              /\s+(?:vs\.?|versus|and)\s+/i
+            )
+            .map(
+              value =>
+                value.trim()
+            )
+            .filter(Boolean);
 
-        if (
-          player &&
-          !players.some(
-            existing =>
-              String(existing.id) ===
-              String(player.id)
-          )
+        for (
+          const term of
+          searchTerms.slice(0, 4)
         ) {
-          players.push(player);
+          try {
+            const player =
+              await findPlayer(
+                term
+              );
+
+            if (
+              player &&
+              !players.some(
+                existing =>
+                  String(
+                    existing.id
+                  ) ===
+                  String(
+                    player.id
+                  )
+              )
+            ) {
+              players.push(
+                player
+              );
+            }
+          } catch {
+            // Continue searching.
+          }
         }
       }
-    }
 
-    // --------------------------------------------------------
-    // COMPARISON
-    // --------------------------------------------------------
+      // --------------------------------------------------------
+      // COMPARISON
+      // --------------------------------------------------------
 
-    if (
-      players.length >= 2 &&
-      (
+      const isComparison =
         lower.includes("compare") ||
         lower.includes(" vs ") ||
         lower.includes("versus") ||
         lower.includes("who has more") ||
-        lower.includes("better")
-      )
-    ) {
-      const stat =
-        detectStat(query) ||
-        "ops";
+        lower.includes("better");
 
-      const comparison = [];
-
-      for (
-        const player of
-        players.slice(0, 4)
+      if (
+        players.length >= 2 &&
+        isComparison
       ) {
         const result =
-          await researchPlayer(
-            player,
+          await comparePlayers(
+            players.slice(0, 4),
             query
           );
 
-        const value =
-          getStatValue(
-            result.totals,
-            stat
-          );
-
-        comparison.push({
-          player:
-            player.fullName,
-
-          id:
-            player.id,
-
-          value,
-
-          formattedValue:
-            formatResearchNumber(
-              value,
-              stat
-            )
+        return res.json({
+          success: true,
+          query,
+          result
         });
       }
 
-      if (
-        stat === "era" ||
-        stat === "whip"
-      ) {
-        comparison.sort(
-          (a, b) =>
-            (a.value ?? Infinity) -
-            (b.value ?? Infinity)
-        );
-      } else {
-        comparison.sort(
-          (a, b) =>
-            (b.value ?? -Infinity) -
-            (a.value ?? -Infinity)
-        );
+      // --------------------------------------------------------
+      // SINGLE PLAYER
+      // --------------------------------------------------------
+
+      if (players.length) {
+        const result =
+          await researchPlayer(
+            players[0],
+            query
+          );
+
+        return res.json({
+          success: true,
+          query,
+          result
+        });
       }
 
-      return res.json({
-        success: true,
-        query,
+      // --------------------------------------------------------
+      // GENERIC PLAYER SEARCH
+      // --------------------------------------------------------
 
-        result: {
-          type: "comparison",
-
-          stat,
-
-          statLabel:
-            statLabel(stat),
-
-          results:
-            comparison
-        }
-      });
-    }
-
-    // --------------------------------------------------------
-    // SINGLE PLAYER
-    // --------------------------------------------------------
-
-    if (players.length) {
-      const result =
-        await researchPlayer(
-          players[0],
+      const cleaned =
+        cleanResearchSearch(
           query
         );
 
+      const search =
+        await searchPlayers(
+          cleaned || query
+        );
+
       return res.json({
         success: true,
+
         query,
-        result
+
+        result: {
+          type: "search",
+
+          message:
+            search.length
+              ? "I found these players."
+              : "I couldn't identify a player or statistic from that question.",
+
+          players:
+            search
+              .slice(0, 10)
+              .map(player => ({
+                id:
+                  player.id,
+
+                name:
+                  player.fullName,
+
+                position:
+                  player.primaryPosition?.name ||
+                  "—"
+              }))
+        }
+      });
+    } catch (error) {
+      console.error(
+        "Research:",
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+
+        error:
+          error.message ||
+          "Research failed."
       });
     }
-
-    // --------------------------------------------------------
-    // FALLBACK PLAYER SEARCH
-    // --------------------------------------------------------
-
-    const search =
-      await searchPlayers(query);
-
-    return res.json({
-      success: true,
-
-      query,
-
-      result: {
-        type: "search",
-
-        message:
-          search.length
-            ? "I found these players."
-            : "I couldn't identify a player from that question.",
-
-        players:
-          search
-            .slice(0, 10)
-            .map(player => ({
-              id:
-                player.id,
-
-              name:
-                player.fullName,
-
-              position:
-                player.primaryPosition?.name ||
-                "—"
-            }))
-      }
-    });
-  } catch (error) {
-    console.error(
-      "Research error:",
-      error
-    );
-
-    res.status(500).json({
-      success: false,
-      error:
-        error.message ||
-        "Research failed."
-    });
   }
-});
+);
 
 // ============================================================
 // HEALTH CHECK
 // ============================================================
 
-app.get("/api/health", (req, res) => {
-  res.json({
-    success: true,
-    service: "Mets HQ",
-    season: CURRENT_SEASON,
-    metsId: METS_ID,
-    statcast: true,
-    timestamp:
-      new Date().toISOString()
-  });
-});
+app.get(
+  "/api/health",
+  (req, res) => {
+    res.json({
+      success: true,
+      service: "Mets HQ",
+      season: CURRENT_SEASON,
+      metsId: METS_ID,
+      statcast: "enabled",
+      timestamp:
+        new Date().toISOString()
+    });
+  }
+);
+
+// ============================================================
+// API 404
+// ============================================================
+
+app.use(
+  "/api",
+  (req, res) => {
+    res.status(404).json({
+      success: false,
+      error:
+        "Mets HQ API endpoint not found."
+    });
+  }
+);
 
 // ============================================================
 // SPA FALLBACK
 // ============================================================
 //
 // IMPORTANT:
-// Express 5 / path-to-regexp does NOT accept app.get("*").
+// Express 5 does NOT accept app.get("*").
+// The correct wildcard syntax is:
+// app.get("/{*splat}", ...)
 //
-// We therefore use app.use() for the fallback.
-//
-// Also notice that index.html is inside /public.
-//
+// Also IMPORTANT:
+// index.html lives in /public.
+// ============================================================
 
-app.use((req, res, next) => {
-  if (
-    req.path.startsWith("/api/")
-  ) {
-    return next();
+app.get(
+  "/{*splat}",
+  (req, res, next) => {
+    if (
+      req.path.startsWith("/api/")
+    ) {
+      return next();
+    }
+
+    res.sendFile(
+      INDEX_FILE,
+      error => {
+        if (error) {
+          console.error(
+            "Unable to serve index.html:",
+            error
+          );
+
+          if (!res.headersSent) {
+            res.status(404).send(
+              "Mets HQ frontend could not be found."
+            );
+          }
+        }
+      }
+    );
   }
-
-  res.sendFile(
-    path.join(
-      PUBLIC_DIR,
-      "index.html"
-    )
-  );
-});
+);
 
 // ============================================================
 // ERROR HANDLER
@@ -2217,7 +2508,7 @@ app.listen(
     );
 
     console.log(
-      `Frontend directory: ${PUBLIC_DIR}`
+      `Frontend: ${INDEX_FILE}`
     );
 
     console.log(
